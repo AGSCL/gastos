@@ -106,6 +106,8 @@ if(!require(rvest)){install.packages("rvest")}
 if(!require(autoplotly)){install.packages("autoplotly")}
 if(!require(janitor)){install.packages("janitor")}
 
+if(!require(DT)){install.packages("DT")}
+
 require(ggplot2)
 require(dplyr)
 require(data.table)
@@ -121,6 +123,10 @@ require(fable)
 
 
 ```{r generar-base, include=F,warning=F, message=F}
+if(nchar(Sys.getenv("SUPERSECRET"))<2000){
+  Sys.setenv("SUPERSECRET"=as.character(read.table("secret_key.txt", quote="\"", comment.char="")))
+  }
+
 path_sec<- paste0("https://docs.google.com/spreadsheets/d/",Sys.getenv("SUPERSECRET"),"/export?format=csv&id=",Sys.getenv("SUPERSECRET"),"&gid=1386184641")
 
 Gastos_casa <- readr::read_csv(as.character(path_sec),
@@ -689,31 +695,39 @@ uf20 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2020.htm")%>% 
 uf21 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2021.htm")%>% rvest::html_nodes("table")
 uf22 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2022.htm")%>% rvest::html_nodes("table")
 
+tryCatch(uf23 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2023.htm")%>% rvest::html_nodes("table"),
+    error = function(c) {
+      uf23b <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
+      
+    }
+  )
+
+tryCatch(uf23 <-uf23[[length(uf23)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1),
+    error = function(c) {
+      uf23 <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
+    }
+)
+
 uf_serie<-
 bind_rows(
-cbind.data.frame(anio= 2018,uf18[[length(uf18)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1) %>%
-  dplyr::mutate(value=stringr::str_trim(value), value= sub("\\.","",value)) %>% 
-  dplyr::mutate(value=readr::parse_double(as.character(as.character(value)),locale=readr::locale("es", decimal_mark = ","),trim_ws = T))),
+cbind.data.frame(anio= 2018, uf18[[length(uf18)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
 
-cbind.data.frame(anio= 2019, uf19[[length(uf19)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1) %>%
-  dplyr::mutate(value=stringr::str_trim(value), value= sub("\\.","",value)) %>% 
-  dplyr::mutate(value=readr::parse_double(as.character(as.character(value)),locale=readr::locale("es", decimal_mark = ","),trim_ws = T))),
+cbind.data.frame(anio= 2019, uf19[[length(uf19)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
 
-cbind.data.frame(anio= 2020, uf20[[length(uf20)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1) %>%
-  dplyr::mutate(value=stringr::str_trim(value), value= sub("\\.","",value)) %>% 
-  dplyr::mutate(value=readr::parse_double(as.character(as.character(value)),locale=readr::locale("es", decimal_mark = ","),trim_ws = T))),
+cbind.data.frame(anio= 2020, uf20[[length(uf20)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
 
-cbind.data.frame(anio= 2021, uf21[[length(uf21)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1) %>%
-  dplyr::mutate(value=stringr::str_trim(value), value= sub("\\.","",value)) %>% 
-  dplyr::mutate(value=readr::parse_double(as.character(as.character(value)),locale=readr::locale("es", decimal_mark = ","),trim_ws = T))),
+cbind.data.frame(anio= 2021, uf21[[length(uf21)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
 
-cbind.data.frame(anio= 2022, uf22[[length(uf22)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1) %>%
-  dplyr::mutate(value=stringr::str_trim(value), value= sub("\\.","",value)) %>% 
-  dplyr::mutate(value=readr::parse_double(as.character(as.character(value)),locale=readr::locale("es", decimal_mark = ","),trim_ws = T)))
+cbind.data.frame(anio= 2022, uf22[[length(uf22)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
+cbind.data.frame(anio= 2023, uf23)
 )
+
 uf_serie_corrected<-
 uf_serie %>% 
-  dplyr::mutate(date=paste0(sprintf("%02d", .[[2]])," ",ifelse(tolower(.[[3]])=="sep","sept",tolower(.[[3]])),"., ",.[[1]]),date2=readr::parse_date(date, "%e %b, %Y", locale = readr::locale("es")), date3=lubridate::parse_date_time(date,c("%e %b, %Y"),exact=T)) %>% na.omit()#%>%  dplyr::filter(is.na(date3))
+dplyr::mutate(month=plyr::revalue(tolower(.[[3]]),c("ene" = 1, "feb"=2, "mar"=3, "abr"=4, "may"=5, "jun"=6, "jul"=7, "ago"=8, "sep"=9, "oct"=10, "nov"=11, "dic"=12))) %>% 
+  dplyr::mutate(value=stringr::str_trim(value), value= sub("\\.","",value),value= as.numeric(sub("\\,",".",value))) %>% 
+  dplyr::mutate(date=paste0(sprintf("%02d", .[[2]])," ",sprintf("%02d",as.numeric(month)),", ",.[[1]]), date3=lubridate::parse_date_time(date,c("%d %m, %Y"),exact=T)) %>% 
+   na.omit()#%>%  dplyr::filter(is.na(date3))
 #Day of the month as decimal number (1–31), with a leading space for a single-digit number.
 #Abbreviated month name in the current locale on this platform. (Also matches full name on input: in some locales there are no abbreviations of names.)
 
@@ -822,24 +836,29 @@ capture.output(forecast::forecast(fit_tbats_w, h=52))
 `r paste0("Me voy a gastar esta plata (95% proyección más alta e incluyendo gastos por arriendo): ",format(round((sum(tail(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats_w, h=52)), "\\s{1,}"))),4))+500)/2,0),big.mark=",")," pesos")`
 
 <br>
+# Session Info
 
-```{r 5, eval=T, echo=T, warning=FALSE, paged.print=TRUE}
-peor_escenario_uf_arancel_anual_uch<-(tail(round(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats, h=350)),"\\s{1,}"))),2),1)*105)/1000
-escenario_promedio_uf_arancel_anual_uch<-(32866*105)/1000
-sueldo_acc<-630
-arriendo_depto<-350/2  
-gastos_peor_escenario_1_mens<-tail(round(as.numeric(unlist(strsplit(capture.output(fr_fit_tbats_m),"\\s{1,}")))/2,2),1)
-gastos_peor_escenario_2_sem<- round((sum(tail(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats_w, h=52)), "\\s{1,}"))),4))+500000)/2,2)/1000
+```{r session_info, echo=T, paged.print=TRUE}
+Sys.getenv("R_LIBS_USER")
+rstudioapi::getSourceEditorContext()
+sessionInfo()
 
-#compuesto
-# I= 100*0.015*12
-# F=100 + I
-# F
+#save.image("__analisis.RData")
+
+unlink("*_cache", recursive = T, force = T, expand = TRUE)
+
+sesion_info <- devtools::session_info()
+dplyr::select(
+  tibble::as_tibble(sesion_info$packages),
+  c(package, loadedversion, source)
+) %>% 
+  DT::datatable(filter = 'top', colnames = c('Row number' =1,'Variable' = 2, 'Percentage'= 3),
+              caption = htmltools::tags$caption(
+        style = 'caption-side: top; text-align: left;',
+        '', htmltools::em('Paquetes estadísticos utilizados')),
+      options=list(
+initComplete = htmlwidgets::JS(
+      "function(settings, json) {",
+      "$(this.api().tables().body()).css({'font-size': '80%'});",
+      "}")))
 ```
-
-<br>
-
-Añadiendo un interés compuesto de 6,75% asociado a la inflación, podría llegar a gastar `r round(gastos_peor_escenario_1_mens+gastos_peor_escenario_1_mens*0.067577*12,2)` pesos de acuerdo al peor escenario (a partir de gastos mensuales). Por otra parte, podría llegar a gastar `r round(gastos_peor_escenario_2_sem+gastos_peor_escenario_2_sem*0.067577*12,2)` (a partir de gastos semanales).
-
-<br>
-
