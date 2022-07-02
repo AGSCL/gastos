@@ -100,6 +100,16 @@ if(!require(SnowballC)){install.packages("SnowballC")}
 if(!require(wordcloud)){install.packages("wordcloud")}
 if(!require(RColorBrewer)){install.packages("RColorBrewer")}
 
+if(!require(tidyverse)){install.packages("tidyverse")}
+if(!require(forecast)){install.packages("forecast")}
+if(!require(xts)){install.packages("xts")}
+if(!require(plotly)){install.packages("plotly")}
+if(!require(readxl)){install.packages("readxl")}
+if(!require(autoplotly)){install.packages("autoplotly")}
+if(!require(sjPlot)){install.packages("sjPlot")}
+
+
+
 require(ggplot2)
 require(dplyr)
 require(data.table)
@@ -661,7 +671,7 @@ bind_rows(fit_month_gasto_20,cbind.data.frame(gasto="Total",gasto_prom=sum(fit_m
 Saqué la UF proyectada 
 
 ```{r 1, echo=T, paged.print=TRUE,eval=T}
-options(max.print=5000)
+#options(max.print=5000)
 
 uf18 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2018.htm")%>% rvest::html_nodes("table")
 uf19 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2019.htm")%>% rvest::html_nodes("table")
