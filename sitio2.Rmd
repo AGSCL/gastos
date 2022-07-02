@@ -107,6 +107,8 @@ if(!require(autoplotly)){install.packages("autoplotly")}
 if(!require(janitor)){install.packages("janitor")}
 
 if(!require(DT)){install.packages("DT")}
+if(!require(keras)){install.packages("keras")}
+
 
 require(ggplot2)
 require(dplyr)
@@ -733,7 +735,6 @@ dplyr::mutate(month=plyr::revalue(tolower(.[[3]]),c("ene" = 1, "feb"=2, "mar"=3,
 
 warning(paste0("number of observations:",nrow(uf_serie_corrected),",  min uf: ",min(uf_serie_corrected$value),",  min date: ",min(uf_serie_corrected $date3 )))
 
-
 # 
 # uf_proyectado <- readxl::read_excel("uf_proyectado.xlsx") %>% dplyr::arrange(Período) %>% 
 #   dplyr::mutate(Período= as.Date(lubridate::parse_date_time(Período, c("%Y-%m-%d"),exact=T)))
@@ -746,7 +747,21 @@ ts(data = uf_serie_corrected$value,
 
 fit_tbats <- forecast::tbats(ts_uf_proy)
 
-  autoplotly::autoplotly(forecast::forecast(fit_tbats, h=298), ts.colour = "darkred",
+
+fr_fit_tbats<-forecast::forecast(fit_tbats, h=298)
+
+```
+
+`r paste0("La proyección de la UF a 298 días más ",tail(uf_serie_corrected$date2,1)+298," sería de: ",format(round(as.numeric(tail(forecast::forecast(fit_tbats, h=298)$mean,1)),0),big.mark=".", decimal.mark = ","), " pesos// Percentil 95% más alto proyectado: ",suppressWarnings(format(tail(round(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats, h=350)),"\\s{1,}"))),2),1),big.mark=".", decimal.mark = ",")))`
+
+Ahora con un modelo ARIMA automático
+
+<br>
+
+```{r 1-5, echo=T, paged.print=TRUE,eval=T}
+arima_optimal_uf = forecast::auto.arima(ts_uf_proy)
+
+  autoplotly::autoplotly(forecast::forecast(arima_optimal_uf, h=298), ts.colour = "darkred",
            predict.colour = "blue", predict.linetype = "dashed")%>% 
   plotly::layout(showlegend = F, 
           yaxis = list(title = "Gastos"),
@@ -759,11 +774,18 @@ fit_tbats <- forecast::tbats(ts_uf_proy)
       tickmode = "array",
     tickangle = 90
     ))
-  
-invisible(paste0("La proyección de la UF al ",as.Date(tail(uf_serie_corrected$date2,1)),"// ","Percentil 95% más alto proyectado: ",tail(round(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats, h=350)),"\\s{1,}"))),2),1)))
-```
 
-`r paste0("La proyección de la UF a 298 días más ",tail(uf_serie_corrected$date2,1)+298," sería de: ",format(round(as.numeric(tail(forecast::forecast(fit_tbats, h=298)$mean,1)),0),big.mark=".", decimal.mark = ","), " pesos// Percentil 95% más alto proyectado: ",suppressWarnings(format(tail(round(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats, h=350)),"\\s{1,}"))),2),1),big.mark=".", decimal.mark = ",")))`
+fr_fit_tbats_uf<-forecast::forecast(arima_optimal_uf, h=298)
+
+dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats)),variable) %>% dplyr::summarise(max=max(value)) %>% 
+dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_uf)),variable) %>% dplyr::summarise(max=max(value)),by="variable") %>% 
+  dplyr::mutate(variable=factor(variable,levels=c("Lo.95","Lo.80","Point.Forecast","Hi.80","Hi.95"))) %>% 
+  dplyr::arrange(variable) %>% 
+  knitr::kable(format="html", caption="Tabla. Estimación UF (de aquí a 298 días) según cálculos de gastos mensuales",
+               col.names= c("Item","UF Proyectada (TBATS)","UF Proyectada (ARIMA)")) %>% 
+  kableExtra::kable_classic(bootstrap_options = c("striped", "hover"),font_size = 12) %>%
+  kableExtra::scroll_box(width = "100%", height = "375px")
+```
 
 <br>
 
@@ -783,7 +805,20 @@ Gastos_casa_m <-
 Gastos_casa_nvo %>% dplyr::group_by(fecha_month)%>%
               dplyr::summarise(gasto_total=(sum(monto)+500000)/1000,fecha=first(fecha))%>%
               data.frame()
+
+uf_serie_corrected_m <-
+uf_serie_corrected %>% dplyr::mutate(ano_m=paste0(anio,"-",sprintf("%02d",as.numeric(month)))) %>%  dplyr::group_by(ano_m)%>%
+              dplyr::summarise(uf=(mean(value))/1000,fecha=first(date3))%>%
+              data.frame() %>% 
+  dplyr::filter(fecha>="2019-02-28")
 #Error: Error in standardise_path(file) : object 'enlace_gastos' not found
+
+ts_uf_serie_corrected_m<-
+ts(data = uf_serie_corrected_m$uf[-length(uf_serie_corrected_m$uf)], 
+   start = 1, 
+   end = nrow(uf_serie_corrected_m), 
+   frequency = 1,
+   deltat = 1, ts.eps = getOption("ts.eps"))
 
 ts_gastos_casa_m<-
 ts(data = Gastos_casa_m$gasto_total[-length(Gastos_casa_m$gasto_total)], 
@@ -793,6 +828,9 @@ ts(data = Gastos_casa_m$gasto_total[-length(Gastos_casa_m$gasto_total)],
    deltat = 1, ts.eps = getOption("ts.eps"))
 
 fit_tbats_m <- forecast::tbats(ts_gastos_casa_m)
+
+forecast::forecast(arima_optimal,h=12)
+
 seq_dates<-format(seq(as.Date("2019/03/01"), by = "month", length = dim(Gastos_casa_m)[1]+12), "%m\n'%y")
 
 autplo2t<-
@@ -810,53 +848,61 @@ autplo2t<-
 autplo2t
 ```
 
+Ahora asumiendo un modelo ARIMA, e incluimos como regresor al precio de la UF.
+
+```{r 2-5, echo=T, paged.print=TRUE,eval=T}
+paste0("Optimo pero sin regresor")
+arima_optimal = forecast::auto.arima(ts_gastos_casa_m)
+arima_optimal
+
+paste0("Optimo pero con regresor")
+arima_optimal2 = forecast::auto.arima(ts_gastos_casa_m, xreg=as.numeric(ts_uf_serie_corrected_m[1:(length(Gastos_casa_m$gasto_total))]))
+arima_optimal2
+
+forecast_uf<-
+cbind.data.frame(fecha=as.Date(seq(as.numeric(as.Date(uf_serie_corrected$date3[length(uf_serie_corrected$date3)])),(as.numeric(as.Date(uf_serie_corrected$date3[length(uf_serie_corrected$date3)]))+299),by=1)),forecast::forecast(fit_tbats, h=300)) %>% 
+  dplyr::mutate(ano_m=stringr::str_extract(fecha,".{7}")) %>% 
+  dplyr::group_by(ano_m)%>%
+              dplyr::summarise(uf=(mean(`Hi 95`,na.rm=T))/1000,fecha=first(fecha))%>%
+            data.frame()
+autplo2t2<-
+  autoplotly::autoplotly(forecast::forecast(arima_optimal2,xreg=c(forecast_uf$uf[1],forecast_uf$uf), h=12), ts.colour = "darkred",
+           predict.colour = "blue", predict.linetype = "dashed")%>% 
+  plotly::layout(showlegend = F, 
+          yaxis = list(title = "Gastos (en miles)"),
+         xaxis = list(
+    title="Fecha",
+      ticktext = as.list(seq_dates[seq(from = 1, to = (dim(Gastos_casa_m)[1]+12), by = 3)]), 
+      tickvals = as.list(seq(from = 1, to = (dim(Gastos_casa_m)[1]+12), by = 3)),
+      tickmode = "array"#"array"
+    )) 
+
+autplo2t2
+```
 
 ```{r 3, echo=T, paged.print=TRUE,eval=T}
 fr_fit_tbats_m<-forecast::forecast(fit_tbats_m, h=12)
+fr_fit_tbats_m2<-forecast::forecast(arima_optimal)
+fr_fit_tbats_m3<-forecast::forecast(arima_optimal2, h=12,xreg=c(forecast_uf$uf[1],forecast_uf$uf))
 
+dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_m3)),variable) %>% dplyr::summarise(max=max(value)), dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_m2)),variable) %>% dplyr::summarise(max=max(value)),by="variable") %>% 
+dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_m)),variable) %>% dplyr::summarise(max=max(value)),by="variable") %>% 
+  dplyr::mutate(variable=factor(variable,levels=c("Lo.95","Lo.80","Point.Forecast","Hi.80","Hi.95"))) %>% 
+  dplyr::arrange(variable) %>% 
+  knitr::kable(format="html", caption="Tabla. Estimación en miles de la plata a gastar en el futuro (de aquí a 12 meses) según cálculos de gastos mensuales",
+               col.names= c("Item","Modelo ARIMA con regresor (UF)","Modelo ARIMA sin regresor","Modelo TBATS")) %>% 
+  kableExtra::kable_classic(bootstrap_options = c("striped", "hover"),font_size = 12) %>%
+  kableExtra::scroll_box(width = "100%", height = "375px")
 ```
 
-`r paste0("Me voy a gastar esta plata (la proyección 95% más alta): ",suppressWarnings(tail(round(as.numeric(unlist(strsplit(capture.output(fr_fit_tbats_m),"\\s{1,}")))/2,2),1))," miles de pesos")`
-
 <br>
 
-Ahora se comparará con la proyección a nivel semanal
-
-<br>
-
-<div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:200px; overflow-x: scroll; width:100%">
-
-```{r 4, echo=T, paged.print=TRUE,eval=T}
-Gastos_casa_ts_w<-
-  data.frame(date_initial=seq(from = as.Date("2019-03-03"), to = as.Date(substr(Sys.time(),1,10)), by = 1)) %>% 
-  dplyr::left_join(dplyr::mutate(Gastos_casa_nvo,date=readr::parse_date(as.character(fecha), "%Y-%m-%d")), by=c("date_initial"="date")) %>% 
-  dplyr::mutate(fecha=strftime(date_initial, format = "%Y-W%V")) %>% 
-  dplyr::group_by(fecha) %>% 
-  #Dejarlo en 1 pesos los vacíos, para que el método de estimación de lambda de Guerrero no se afecte
-  dplyr::summarise(date=min(date_initial),monto=sum(ifelse(is.na(monto),1,monto))) %>% 
-  dplyr::slice(-((n()-5):n()))
-
-fit_tbats_w <- forecast::tbats(Gastos_casa_ts_w$monto)
-capture.output(forecast::forecast(fit_tbats_w, h=52))
-```
-
-</div>
-
-<br>
-
-`r paste0("Me voy a gastar esta plata (95% proyección más alta e incluyendo gastos por arriendo): ",format(round((sum(tail(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats_w, h=52)), "\\s{1,}"))),4))+500)/2,0),big.mark=",")," pesos")`
-
-<br>
 # Session Info
 
 ```{r session_info, echo=T, paged.print=TRUE}
 Sys.getenv("R_LIBS_USER")
-rstudioapi::getSourceEditorContext()
 sessionInfo()
-
 #save.image("__analisis.RData")
-
-unlink("*_cache", recursive = T, force = T, expand = TRUE)
 
 sesion_info <- devtools::session_info()
 dplyr::select(
