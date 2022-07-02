@@ -773,7 +773,7 @@ Lo haré en base a 2 cálculos: el gasto semanal y el gasto mensual en base a mi
 
 
 ```{r 2, echo=T, paged.print=TRUE,eval=T}
-Gastos_casa <- readr::read_csv(enlace_gastos,
+Gastos_casa <- readr::read_csv(as.character(path_sec),
                                col_names = c("Tiempo", "gasto", "fecha", "obs", "monto", "gastador",
                                              "link"),skip=1) %>% 
               dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
@@ -783,14 +783,15 @@ Gastos_casa_m <-
 Gastos_casa %>% dplyr::group_by(fecha_month)%>%
               dplyr::summarise(gasto_total=(sum(monto)+500000)/1000,fecha=first(fecha))%>%
               data.frame()
+#Error: Error in standardise_path(file) : object 'enlace_gastos' not found
 
 fit_tbats_m <- forecast::tbats(Gastos_casa_m$gasto_total[-length(Gastos_casa_m$gasto_total)])
 seq_dates<-format(seq(as.Date("2019/03/01"), by = "month", length = dim(Gastos_casa_m)[1]+12), "%m\n'%y")
 
 autplo2t<-
-  autoplotly(forecast::forecast(fit_tbats_m, h=12), ts.colour = "darkred",
+  autoplotly::autoplotly(forecast::forecast(fit_tbats_m, h=12), ts.colour = "darkred",
            predict.colour = "blue", predict.linetype = "dashed")%>% 
-  layout(showlegend = F, 
+  plotly::layout(showlegend = F, 
           yaxis = list(title = "Gastos"),
          xaxis = list(
     title="Fecha",
