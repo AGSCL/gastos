@@ -41,6 +41,7 @@ body{ /* Normal  */
 }
 </style>
 
+<div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
 
 ```{r setup, include=FALSE}
 # ---
@@ -72,7 +73,6 @@ if(!require(rowr)){install.packages("rowr")}
 if(!require(plyr)){install.packages("plyr")}
 if(!require(fUnitRoots)){install.packages("fUnitRoots")}
 if(!require(reshape2)){install.packages("reshape2")}
-if(!require(tidyr)){install.packages("tidyr")}
 if(!require(data.table)){install.packages("data.table")}
 if(!require(DataExplorer)){install.packages("DataExplorer")}
 if(!require(stringi)){install.packages("stringi")}
@@ -90,8 +90,7 @@ if(!require(lattice)){install.packages("lattice")}
 
 if(!require(sjPlot)){install.packages("sjPlot")}
 if(!require(gsynth)){install.packages("gsynth")}
-if(!require(ggplot2)){install.packages("ggplot2")}
-if(!require(dplyr)){install.packages("dplyr")}
+if(!require(tidyverse)){install.packages("tidyverse")}
 if(!require(tsibble)){install.packages("tsibble")}
 
 
@@ -100,15 +99,12 @@ if(!require(SnowballC)){install.packages("SnowballC")}
 if(!require(wordcloud)){install.packages("wordcloud")}
 if(!require(RColorBrewer)){install.packages("RColorBrewer")}
 
-if(!require(tidyverse)){install.packages("tidyverse")}
 if(!require(forecast)){install.packages("forecast")}
 if(!require(xts)){install.packages("xts")}
 if(!require(plotly)){install.packages("plotly")}
-if(!require(readxl)){install.packages("readxl")}
+if(!require(rvest)){install.packages("rvest")}
 if(!require(autoplotly)){install.packages("autoplotly")}
-if(!require(sjPlot)){install.packages("sjPlot")}
-
-
+if(!require(janitor)){install.packages("janitor")}
 
 require(ggplot2)
 require(dplyr)
@@ -118,6 +114,8 @@ require(sjPlot)
 require(maditr)
 require(fable)
 ```
+
+</div>
 
 # 1. Gastos (cálculos antiguos)
 
@@ -434,6 +432,7 @@ Gastos_casa %>%
                                             gasto=="Bendina Reñaca"~"Gas/Bencina",
                                             gasto=="Bencina Reñaca"~"Gas/Bencina",
                                             gasto=="Vacunas Influenza"~"Farmacia",
+                                            gasto=="Remedios"~"Farmacia",
                                             gasto=="Plata fiestas patrias basureros"~"donaciones/regalos",
                                         T~gasto)) %>% 
     dplyr::group_by(gastador, fecha,gasto, .drop=F) %>%
@@ -625,6 +624,7 @@ fit_month_gasto <- Gastos_casa %>%
                                             gasto=="Bendina Reñaca"~"Gas/Bencina",
                                             gasto=="Bencina Reñaca"~"Gas/Bencina",
                                             gasto=="Vacunas Influenza"~"Farmacia",
+                                            gasto=="Remedios"~"Farmacia",
                                             gasto=="Plata fiestas patrias basureros"~"donaciones/regalos",
                                         T~gasto)) %>% 
   dplyr::mutate(fecha_month=factor(fecha_month, levels=format(seq(from = as.Date("2019-03-03"), to = as.Date(substr(Sys.time(),1,10)), by = "1 month"),"%Y-%m")))%>% 
@@ -664,13 +664,12 @@ fit_month_gasto %>%
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
   data.frame()
 
-bind_cols(
-bind_rows(fit_month_gasto_22,cbind.data.frame(gasto="Total",gasto_prom=sum(fit_month_gasto_22$gasto_prom))),
-bind_rows(fit_month_gasto_21,cbind.data.frame(gasto="Total",gasto_prom=sum(fit_month_gasto_21$gasto_prom))),
-bind_rows(fit_month_gasto_20,cbind.data.frame(gasto="Total",gasto_prom=sum(fit_month_gasto_20$gasto_prom)))) %>% 
-  dplyr::select(-3) %>% 
+dplyr::right_join(fit_month_gasto_22,fit_month_gasto_21,by="gasto") %>% 
+dplyr::right_join(fit_month_gasto_20,by="gasto") %>% 
+  janitor::adorn_totals() %>% 
+  #dplyr::select(-3) %>% 
   knitr::kable(format="html", caption="Tabla. Gastos promedio por ítem a contar del...",
-               col.names= c("Item","Gasto... 2022","Gasto... 2021","Gasto... 2020")) %>% 
+               col.names= c("Item","2022","2021","2020")) %>% 
   kableExtra::kable_classic(bootstrap_options = c("striped", "hover"),font_size = 12) %>%
   kableExtra::scroll_box(width = "100%", height = "375px")
 ```
