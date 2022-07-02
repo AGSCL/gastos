@@ -123,7 +123,7 @@ require(fable)
 
 
 ```{r generar-base, include=F,warning=F, message=F}
-if(nchar(Sys.getenv("SUPERSECRET"))<2000){
+if(nchar(Sys.getenv("SUPERSECRET"))<2){
   Sys.setenv("SUPERSECRET"=as.character(read.table("secret_key.txt", quote="\"", comment.char="")))
   }
 
