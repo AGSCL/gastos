@@ -633,6 +633,16 @@ fit_month_gasto <- Gastos_casa %>%
     dplyr::summarise(gasto_total=sum(monto, na.rm = T)/1000)%>%
   data.frame()
 
+fit_month_gasto_22<-
+fit_month_gasto %>% 
+    #dplyr::filter()
+    dplyr::filter(grepl("2022",fecha_month)) %>% 
+    #sacar el ultimo mes
+    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
+    dplyr::group_by(gasto) %>% 
+    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
+  data.frame()
+
 fit_month_gasto_21<-
 fit_month_gasto %>% 
     #dplyr::filter()
@@ -655,11 +665,12 @@ fit_month_gasto %>%
   data.frame()
 
 bind_cols(
+bind_rows(fit_month_gasto_22,cbind.data.frame(gasto="Total",gasto_prom=sum(fit_month_gasto_22$gasto_prom))),
 bind_rows(fit_month_gasto_21,cbind.data.frame(gasto="Total",gasto_prom=sum(fit_month_gasto_21$gasto_prom))),
 bind_rows(fit_month_gasto_20,cbind.data.frame(gasto="Total",gasto_prom=sum(fit_month_gasto_20$gasto_prom)))) %>% 
   dplyr::select(-3) %>% 
   knitr::kable(format="html", caption="Tabla. Gastos promedio por ítem a contar del...",
-               col.names= c("Item","Gasto... 2021","Gasto... 2020")) %>% 
+               col.names= c("Item","Gasto... 2022","Gasto... 2021","Gasto... 2020")) %>% 
   kableExtra::kable_classic(bootstrap_options = c("striped", "hover"),font_size = 12) %>%
   kableExtra::scroll_box(width = "100%", height = "375px")
 ```
