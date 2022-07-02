@@ -44,6 +44,7 @@ body{ /* Normal  */
 <div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
 
 ```{r setup, include=FALSE}
+ Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
 # ---
 # title: "Gastos Casa"
 # date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -587,25 +588,25 @@ wordcloud(words = df$word, freq = df$freq,
           colors=brewer.pal(8, "Dark2"), main="Figura 7. Nube de Palabras, Observaciones")
 ```
 
-```{r month-gasto, echo=T,fig.align='center', fig.pos='H', eval=T, message=FALSE, warning=F}
+```{r month-gasto-recategorizar, echo=T,fig.align='center', fig.pos='H', eval=T, message=FALSE, warning=F}
 fit_month_gasto <- Gastos_casa %>%
     dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
     dplyr::mutate(fecha_month=strftime(fecha, format = "%Y-%m")) %>%
     dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))%>%
-  dplyr::mutate(gasto= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
+  dplyr::mutate(gasto2= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
     gasto=="aspiradora"~"electrodomésticos/mantención casa",
                                             gasto=="Plata fiestas patrias basureros"~"donaciones/regalos",
-                                            gasto=="Tina"~"electrodomésticos/mantención casa",
+                                            gasto=="Tina"~"Electrodomésticos/ Mantención casa",
                                             gasto=="Nexium"~"Farmacia",
                                             gasto=="donaciones"~"donaciones/regalos",
                                             gasto=="Regalo chocolates"~"donaciones/regalos",
-                                            gasto=="filtro piscina msp"~"electrodomésticos/mantención casa",
-                                            gasto=="Chromecast"~"electrodomésticos/mantención casa",
-                                            gasto=="Muebles ratan"~"electrodomésticos/mantención casa",
+                                            gasto=="filtro piscina msp"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Chromecast"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Muebles ratan"~"Electrodomésticos/ Mantención casa",
                                             gasto=="Vacuna Influenza"~"Farmacia",
-                                            gasto=="Easy"~"electrodomésticos/mantención casa",
-                                            gasto=="Sopapo"~"electrodomésticos/mantención casa",
-                                            gasto=="filtro agua"~"electrodomésticos/mantención casa",
+                                            gasto=="Easy"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Sopapo"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="filtro agua"~"Electrodomésticos/ Mantención casa",
                                             gasto=="ropa tami"~"donaciones/regalos",
                                             gasto=="yaz"~"Farmacia",
                                             gasto=="Yaz"~"Farmacia",
@@ -619,13 +620,13 @@ fit_month_gasto <- Gastos_casa %>%
                                             gasto=="Granola Wild Foods"~"Comida",
                                             gasto=="uber"~"Otros",
                                             gasto=="Uber Reñaca"~"Otros",
-                                            gasto=="filtro piscina mspa"~"electrodomésticos/mantención casa",
-                                            gasto=="Limpieza Alfombra"~"electrodomésticos/mantención casa",
-                                            gasto=="Aspiradora"~"electrodomésticos/mantención casa",
-                                            gasto=="Limpieza alfombras"~"electrodomésticos/mantención casa",
-                                            gasto=="Pila estufa"~"electrodomésticos/mantención casa",
-                                            gasto=="Reloj"~"electrodomésticos/mantención casa",
-                                            gasto=="Arreglo"~"electrodomésticos/mantención casa",
+                                            gasto=="filtro piscina mspa"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Limpieza Alfombra"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Aspiradora"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Limpieza alfombras"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Pila estufa"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Reloj"~"Electrodomésticos/ Mantención casa",
+                                            gasto=="Arreglo"~"Electrodomésticos/ Mantención casa",
                                             gasto=="Pan Pepperino"~"Comida",
                                             gasto=="Cookidoo"~"Comida",
                                             gasto=="remedios"~"Farmacia",
@@ -636,10 +637,10 @@ fit_month_gasto <- Gastos_casa %>%
                                             gasto=="Plata fiestas patrias basureros"~"donaciones/regalos",
                                         T~gasto)) %>% 
   dplyr::mutate(fecha_month=factor(fecha_month, levels=format(seq(from = as.Date("2019-03-03"), to = as.Date(substr(Sys.time(),1,10)), by = "1 month"),"%Y-%m")))%>% 
-  dplyr::mutate(gasto2=factor(gasto, levels=c("Agua", "Comida", "Comunicaciones","Electricidad", "Enceres", "Farmacia", "Gas/Bencina", "Diosi", "donaciones/regalos", "electrodomésticos/mantención casa", "VTR", "Netflix", "Otros")))%>% 
-    dplyr::group_by(fecha_month, gasto, .drop=F)%>%
+  dplyr::mutate(gasto2=factor(gasto2, levels=c("Agua", "Comida", "Comunicaciones","Electricidad", "Enceres", "Farmacia", "Gas/Bencina", "Diosi", "donaciones/regalos", "Electrodomésticos/ Mantención casa", "VTR", "Netflix", "Otros")))%>% 
+    dplyr::group_by(fecha_month, gasto2, .drop=F)%>%
     dplyr::summarise(gasto_total=sum(monto, na.rm = T)/1000)%>%
-  data.frame()
+  data.frame() %>% na.omit()
 
 fit_month_gasto_23<-
 fit_month_gasto %>% 
@@ -647,9 +648,9 @@ fit_month_gasto %>%
     dplyr::filter(grepl("2023",fecha_month)) %>% 
     #sacar el ultimo mes
     dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
-    dplyr::group_by(gasto) %>% 
+    dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()
+  data.frame()%>% ungroup()
 
 fit_month_gasto_22<-
 fit_month_gasto %>% 
@@ -657,9 +658,9 @@ fit_month_gasto %>%
     dplyr::filter(grepl("2022",fecha_month)) %>% 
     #sacar el ultimo mes
     dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
-    dplyr::group_by(gasto) %>% 
+    dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()
+  data.frame()%>% ungroup()
 
 fit_month_gasto_21<-
 fit_month_gasto %>% 
@@ -667,9 +668,9 @@ fit_month_gasto %>%
     dplyr::filter(grepl("2021|2022",fecha_month)) %>% 
     #sacar el ultimo mes
     dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
-    dplyr::group_by(gasto) %>% 
+    dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()
+  data.frame()%>% ungroup()
 
 
 fit_month_gasto_20<-
@@ -678,14 +679,14 @@ fit_month_gasto %>%
     dplyr::filter(grepl("202",fecha_month)) %>% 
     #sacar el ultimo mes
     dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
-    dplyr::group_by(gasto) %>% 
+    dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()
+  data.frame() %>% ungroup()
 
 fit_month_gasto_23 %>% 
-dplyr::right_join(,fit_month_gasto_22,by="gasto") %>%
-dplyr::right_join(fit_month_gasto_22,fit_month_gasto_21,by="gasto") %>% 
-dplyr::right_join(fit_month_gasto_20,by="gasto") %>% 
+dplyr::right_join(fit_month_gasto_22,by="gasto2") %>%
+dplyr::right_join(fit_month_gasto_22,fit_month_gasto_21,by="gasto2") %>% 
+dplyr::right_join(fit_month_gasto_20,by="gasto2") %>% 
   janitor::adorn_totals() %>% 
   #dplyr::select(-3) %>% 
   knitr::kable(format="html", caption="Tabla. Gastos promedio por ítem a contar del...",
@@ -841,8 +842,6 @@ ts(data = Gastos_casa_m$gasto_total[-length(Gastos_casa_m$gasto_total)],
 
 fit_tbats_m <- forecast::tbats(ts_gastos_casa_m)
 
-forecast::forecast(arima_optimal,h=12)
-
 seq_dates<-format(seq(as.Date("2019/03/01"), by = "month", length = dim(Gastos_casa_m)[1]+12), "%m\n'%y")
 
 autplo2t<-
@@ -894,7 +893,7 @@ autplo2t2
 
 ```{r 3, echo=T, paged.print=TRUE,eval=T}
 fr_fit_tbats_m<-forecast::forecast(fit_tbats_m, h=12)
-fr_fit_tbats_m2<-forecast::forecast(arima_optimal)
+fr_fit_tbats_m2<-forecast::forecast(arima_optimal, h=12)
 fr_fit_tbats_m3<-forecast::forecast(arima_optimal2, h=12,xreg=c(forecast_uf$uf[1],forecast_uf$uf))
 
 dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_m3)),variable) %>% dplyr::summarise(max=max(value)), dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_m2)),variable) %>% dplyr::summarise(max=max(value)),by="variable") %>% 
