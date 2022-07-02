@@ -769,30 +769,37 @@ invisible(paste0("La proyección de la UF al ",as.Date(tail(uf_serie_corrected$d
 
 # 3. Gastos proyectados
 
-Lo haré en base a 2 cálculos: el gasto semanal y el gasto mensual en base a mis gastos desde marzo de 2019. La primera proyección la hice añadiendo el precio del arriendo mensual y partiendo en 2 (porque es con yo y Tami).
+Lo haré en base a 2 cálculos: el gasto semanal y el gasto mensual en base a mis gastos desde marzo de 2019. La primera proyección la hice añadiendo el precio del arriendo mensual y partiendo en 2 (porque es con yo y Tami). No se incluye el último mes.
 
 
 ```{r 2, echo=T, paged.print=TRUE,eval=T}
-Gastos_casa <- readr::read_csv(as.character(path_sec),
+Gastos_casa_nvo <- readr::read_csv(as.character(path_sec),
                                col_names = c("Tiempo", "gasto", "fecha", "obs", "monto", "gastador",
                                              "link"),skip=1) %>% 
               dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
               dplyr::mutate(fecha_month=strftime(fecha, format = "%Y-%m")) %>%
               dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))
 Gastos_casa_m <-
-Gastos_casa %>% dplyr::group_by(fecha_month)%>%
+Gastos_casa_nvo %>% dplyr::group_by(fecha_month)%>%
               dplyr::summarise(gasto_total=(sum(monto)+500000)/1000,fecha=first(fecha))%>%
               data.frame()
 #Error: Error in standardise_path(file) : object 'enlace_gastos' not found
 
-fit_tbats_m <- forecast::tbats(Gastos_casa_m$gasto_total[-length(Gastos_casa_m$gasto_total)])
+ts_gastos_casa_m<-
+ts(data = Gastos_casa_m$gasto_total[-length(Gastos_casa_m$gasto_total)], 
+   start = 1, 
+   end = nrow(Gastos_casa_m), 
+   frequency = 1,
+   deltat = 1, ts.eps = getOption("ts.eps"))
+
+fit_tbats_m <- forecast::tbats(ts_gastos_casa_m)
 seq_dates<-format(seq(as.Date("2019/03/01"), by = "month", length = dim(Gastos_casa_m)[1]+12), "%m\n'%y")
 
 autplo2t<-
   autoplotly::autoplotly(forecast::forecast(fit_tbats_m, h=12), ts.colour = "darkred",
            predict.colour = "blue", predict.linetype = "dashed")%>% 
   plotly::layout(showlegend = F, 
-          yaxis = list(title = "Gastos"),
+          yaxis = list(title = "Gastos (en miles)"),
          xaxis = list(
     title="Fecha",
       ticktext = as.list(seq_dates[seq(from = 1, to = (dim(Gastos_casa_m)[1]+12), by = 3)]), 
@@ -822,7 +829,7 @@ Ahora se comparará con la proyección a nivel semanal
 ```{r 4, echo=T, paged.print=TRUE,eval=T}
 Gastos_casa_ts_w<-
   data.frame(date_initial=seq(from = as.Date("2019-03-03"), to = as.Date(substr(Sys.time(),1,10)), by = 1)) %>% 
-  dplyr::left_join(dplyr::mutate(Gastos_casa,date=readr::parse_date(as.character(fecha), "%Y-%m-%d")), by=c("date_initial"="date")) %>% 
+  dplyr::left_join(dplyr::mutate(Gastos_casa_nvo,date=readr::parse_date(as.character(fecha), "%Y-%m-%d")), by=c("date_initial"="date")) %>% 
   dplyr::mutate(fecha=strftime(date_initial, format = "%Y-W%V")) %>% 
   dplyr::group_by(fecha) %>% 
   #Dejarlo en 1 pesos los vacíos, para que el método de estimación de lambda de Guerrero no se afecte
