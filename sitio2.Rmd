@@ -44,7 +44,11 @@ body{ /* Normal  */
 <div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
 
 ```{r setup, include=FALSE}
- Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
+Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
+Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
+Sys.setlocale("LC_CTYPE", "Spanish_Chile.1252")
+Sys.setlocale("LC_MONETARY", "Spanish_Chile.1252")
+Sys.setlocale("LC_TIME", "Spanish_Chile.1252")
 # ---
 # title: "Gastos Casa"
 # date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -108,7 +112,7 @@ if(!require(autoplotly)){install.packages("autoplotly")}
 if(!require(janitor)){install.packages("janitor")}
 
 if(!require(DT)){install.packages("DT")}
-if(!require(keras)){install.packages("keras")}
+if(!require(SentimentAnalysis)){install.packages("tidytext")}
 
 
 require(ggplot2)
@@ -315,51 +319,8 @@ plot<-Gastos_casa %>%
 plotly::ggplotly(plot)  
 ```
 
-
-
-```{r ts-month-gastos,echo=T,fig.align='center', echo=T, fig.pos='H', eval=T, message=FALSE, warning=F}
-plot2<-Gastos_casa %>%
-    dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
-    dplyr::mutate(fecha_week=strftime(fecha, format = "%Y-W%V")) %>%
-    dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))%>%
-    dplyr::group_by(day)%>%
-    dplyr::summarise(gasto_total=sum(monto)/1000) %>%
-      ggplot2::ggplot(aes(x = day, y = gasto_total)) +
-      geom_line(size=1) +
-      sjPlot::theme_sjplot2() +
-      geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
-      geom_vline(xintercept = as.Date("2020-03-23"),linetype = "dashed", color="red") +
-      labs(y="Gastos (en miles)",x="Meses/Año", subtitle="Interlineado, incorporación de la Diosi") + 
-      ggtitle( "Figura 5. Suma de Gastos por Día") +        
-      scale_x_date(breaks = "1 month", minor_breaks = "1 week", labels=scales::date_format("%m/%y")) +
-      theme(axis.text.x = element_text(vjust = 0.5,angle = 45)) 
-plotly::ggplotly(plot2)  
-
-tsData <- Gastos_casa %>%
-    dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
-    dplyr::mutate(fecha_week=strftime(fecha, format = "%Y-W%V")) %>%
-    dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))%>%
-    dplyr::group_by(day)%>%
-    dplyr::summarise(gasto_total=sum(monto))%>%
-    dplyr::mutate(covid=case_when(day>as.Date("2019-06-02")~1,TRUE~0))%>%
-    dplyr::mutate(covid=case_when(day>as.Date("2020-03-10")~covid+1,TRUE~covid))%>%
-    dplyr::mutate(covid=as.factor(covid))%>%
-  data.frame()
-
-  
-tsData_gastos <-ts(tsData$gasto_total, frequency=7)
-mstsData_gastos <- forecast::msts(Gastos_casa$monto, seasonal.periods=c(7,30))
-  tsData_gastos = decompose(tsData_gastos)
-#plot(tsData_Santiago, title="Descomposición del número de casos confirmados para Santiago")
-forecast::autoplot(tsData_gastos, main="Decomposición de los Gastos Diarios")+
-    theme_bw()+ labs(x="Weeks")
-
-tsdata_gastos_trend<-cbind(tsData,trend=as.vector(tsData_gastos$trend))%>% na.omit()
-
-```
-
 <div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
-```{r itsa,echo=T,fig.align='center', echo=T, fig.pos='H', eval=T, message=FALSE, warning=F}
+```{r itsa2, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 6. Gasto Mensual"}
 #tsData_gastos$trend
 #Using the inputted variables, a Type-2 Sum Squares ANCOVA Lagged Dependent Variable model is fitted which estimates the difference in means between interrupted and non-interrupted time periods, while accounting for the lag of the dependent variable and any further specified covariates.
 #Typically such analyses use Auto-regressive Integrated Moving Average (ARIMA) models to handle the serial dependence of the residuals of a linear model, which is estimated either as part of the ARIMA process or through a standard linear regression modeling process [9,17]. All such time series methods enable the effect of the event to be separated from general trends and serial dependencies in time, thereby enabling valid statistical inferences to be made about whether an intervention has had an effect on a time series.
@@ -368,21 +329,6 @@ tsdata_gastos_trend<-cbind(tsData,trend=as.vector(tsData_gastos$trend))%>% na.om
 #residual autocorrelation assumptions
 #TSA allows the model to account for baseline levels and trends present in the data therefore allowing us to attribute significant changes to the interruption
 #RDestimate(all~agecell,data=metro_region,cutpoint = 21)
-
-#Ver con CHANGEPOINT
-##http://www.lancs.ac.uk/~killick/Pub/KillickEckley2011.pdf
-
-itsa_metro_region_quar<-
-        its.analysis::itsa.model(time = "day", depvar = "gasto_total",data=tsData,
-                                 interrupt_var = "covid", 
-                                 alpha = 0.05,no.plots = F, bootstrap = TRUE, Reps = 10000, print = F) 
-
-print(itsa_metro_region_quar)
-```
-</div>
-
-<div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
-```{r itsa2,eeval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 6. Gasto Mensual"}
 itsa_metro_region_quar2<-
         its.analysis::itsa.model(time = "day", depvar = "trend",data=tsdata_gastos_trend,
                                  interrupt_var = "covid", 
@@ -394,6 +340,7 @@ print(itsa_metro_region_quar2)
 Ahora con las tendencias descompuestas
  
 ```{r linea-tiempo-gastador-gastos-tipo, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 7. Gasto Mensual"}
+
 require(zoo)
 require(scales)
 Gastos_casa %>%
@@ -695,6 +642,60 @@ dplyr::right_join(fit_month_gasto_20,by="gasto2") %>%
   kableExtra::scroll_box(width = "100%", height = "375px")
 ```
 
+
+```{r month-gasto-recategorizar2, echo=FALSE}
+
+chat <- data.frame(Gastos_casa$obs) %>%
+ dplyr::mutate(count_character= nchar(Gastos_casa.obs), 
+ words= nchar(gsub('[^ ]+', '',Gastos_casa.obs))+1)
+
+#similar to chat but we are not removing the entries where author is null
+
+to_remove <- c(stopwords(kind="spanish"), c("usted", "ahí", "aquí", "acá", 
+                                              "pues", "tal", "tan", "así", "dijo", "dicen","xq","status","wnes","jaja","jajaj","tb","t","mensaje",
+                                              "cómo", "sino", "entonces", "aunque", "don", "doña","nomas","si","pa","jajajaja","jjaja",
+                                              "alla", "creo", "cada", "alla", "le", "el", "la", "en","weon","wea","q","jajaja","ajaja",
+                                              "igual", "pasa", "pasan", "hace","manda","cacha", "multimedia","wn","po","cn","pal","ta","ajajajja", "ajajajjaja", "seee", "ajajajajja", "wajajajajajjaja", "wajajaja", "10", "1", "pq", "jajajajajajaja", "k",
+                                              "toda", "ahora", "tema", "omitido", "que","Porqué","siempre","https","toy","mas","2","3",
+                                              "hacen", "hacer","ajajajajaja", "jajajajajaja", "jajajajaja", "jajajajaja"))
+
+library(stringi)
+
+chat$text2 <- stri_replace_all_regex(chat$Gastos_casa.obs,
+                                  pattern=paste0(" ",to_remove," "),
+                                  replacement=rep(" ",length(to_remove)),
+                                  vectorize=FALSE)
+
+chat_clean <- chat %>%
+  unnest_tokens(word, text2) %>%
+  anti_join(stop_words)
+
+
+chat_clean <- chat_clean %>%
+  na.omit(chat_clean)
+
+chat_clean <- chat_clean %>%
+  filter(!word %in% to_remove)
+
+library("tidytext")
+chat %>%
+    tidytext::unnest_tokens(input = text2,
+                  output = word) %>%
+    filter(!word %in% to_remove)%>%
+    count(word, sort = TRUE) %>%
+    #group_by(author) %>%
+    top_n(n = 20, n) %>%
+    dplyr::filter(!is.na(word)) %>% 
+    ggplot(aes(x = stats::reorder(word, n), y = n)) +
+    geom_col(show.legend = FALSE) +
+    ylab("") +
+    xlab("") +
+    coord_flip() +
+#    facet_wrap(~author, ncol = 2, scales = "free_y") +
+    scale_x_reordered() +
+    ggtitle("Gastos detallados más usados")
+```
+
 <br>
 
 # 2. UF Proyectada
@@ -807,7 +808,7 @@ dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_uf)),va
 Lo haré en base a 2 cálculos: el gasto semanal y el gasto mensual en base a mis gastos desde marzo de 2019. La primera proyección la hice añadiendo el precio del arriendo mensual y partiendo en 2 (porque es con yo y Tami). No se incluye el último mes.
 
 
-```{r 2, echo=T, paged.print=TRUE,eval=T}
+```{r 2, echo=T, paged.print=TRUE,eval=T , echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE,caption="Figura. Proyección de gastos (incluyendo arriendo), Modelo TBATS"}
 Gastos_casa_nvo <- readr::read_csv(as.character(path_sec),
                                col_names = c("Tiempo", "gasto", "fecha", "obs", "monto", "gastador",
                                              "link"),skip=1) %>% 
@@ -861,7 +862,7 @@ autplo2t
 
 Ahora asumiendo un modelo ARIMA, e incluimos como regresor al precio de la UF.
 
-```{r 2-5, echo=T, paged.print=TRUE,eval=T}
+```{r 2-5, echo=T, paged.print=TRUE,eval=T , echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE,caption="Figura. Proyección de gastos mensuales de aquí a 12 meses (incluye arriendo), Modelo ARIMA y con regresor UF promedio mensual (desde 2018)"}
 paste0("Optimo pero sin regresor")
 arima_optimal = forecast::auto.arima(ts_gastos_casa_m)
 arima_optimal
@@ -871,7 +872,7 @@ arima_optimal2 = forecast::auto.arima(ts_gastos_casa_m, xreg=as.numeric(ts_uf_se
 arima_optimal2
 
 forecast_uf<-
-cbind.data.frame(fecha=as.Date(seq(as.numeric(as.Date(uf_serie_corrected$date3[length(uf_serie_corrected$date3)])),(as.numeric(as.Date(uf_serie_corrected$date3[length(uf_serie_corrected$date3)]))+299),by=1)),forecast::forecast(fit_tbats, h=300)) %>% 
+cbind.data.frame(fecha=as.Date(seq(as.numeric(as.Date(uf_serie_corrected$date3[length(uf_serie_corrected$date3)])),(as.numeric(as.Date(uf_serie_corrected$date3[length(uf_serie_corrected$date3)]))+299),by=1), origin = "1970-01-01"),forecast::forecast(fit_tbats, h=300)) %>% 
   dplyr::mutate(ano_m=stringr::str_extract(fecha,".{7}")) %>% 
   dplyr::group_by(ano_m)%>%
               dplyr::summarise(uf=(mean(`Hi 95`,na.rm=T))/1000,fecha=first(fecha))%>%

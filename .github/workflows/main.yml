@@ -32,18 +32,16 @@ jobs:
         run: |
           echo SUPERSECRET="$SUPERSECRET" >> ~/.Renviron
         shell: bash
-      - name: Install dependencies
+      - name: Install dependencies and Run
         run: |
           Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
           Sys.setlocale("LC_CTYPE", "Spanish_Chile.1252")
           Sys.setlocale("LC_MONETARY", "Spanish_Chile.1252")
           Sys.setlocale("LC_TIME", "Spanish_Chile.1252")
-          install.packages(c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud",
-          "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact","bsts",
-          "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis","lubridate"))
-        shell: Rscript {0}
-      - name: Render Site
-        run: rmarkdown::render("sitio2.Rmd")
+          install.packages(c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud","autoplotly",
+          "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact","bsts","DT",
+          "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis","lubridate", "tidytext"))
+          rmarkdown::render("sitio2.Rmd")
         shell: Rscript {0}
       - name: Commit files
         run: |
