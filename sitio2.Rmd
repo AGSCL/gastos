@@ -112,7 +112,8 @@ if(!require(autoplotly)){install.packages("autoplotly")}
 if(!require(janitor)){install.packages("janitor")}
 
 if(!require(DT)){install.packages("DT")}
-if(!require(SentimentAnalysis)){install.packages("tidytext")}
+if(!require(tidytext)){install.packages("tidytext")}
+if(!require(fable)){install.packages("fable")}
 
 
 require(ggplot2)
@@ -157,7 +158,7 @@ head(Gastos_casa)
 ```
 
 
-```{r fig-1, echo=FALSE, fig.height=4, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 1. Tipos de Gasto por Persona"}
+```{r fig-1, echo=FALSE, fig.height=4, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Tipos de Gasto por Persona"}
 
 Gastos_casa %>% 
   dplyr::mutate(gastos_mod=dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
@@ -217,7 +218,7 @@ ggplot2::ggplot(aes(x=as.factor(gastos_mod),y=as.numeric(monto))) +
   ) 
 ```
 
-```{r gasto-tot-por-gastador, echo=FALSE, fig.height=4, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura 2. Promedio de gasto por gastador", cache=T}
+```{r gasto-tot-por-gastador, echo=FALSE, fig.height=4, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura. Promedio de gasto por gastador", cache=T}
 
 #para ver las diferencias depués de la diosi
 Gastos_casa %>%
@@ -235,7 +236,7 @@ gplots::plotmeans(gasto_media ~ gastador_nombre, main="Promedio de gasto por gas
 
 ```
 
-```{r comp_medias-por-diosi, echo=T, fig.height=4, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 3. Antes y Depsués de Diosi"}
+```{r comp_medias-por-diosi, echo=T, fig.height=4, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Antes y Depsués de Diosi"}
 
 par(mfrow=c(1,2)) 
 gplots::plotmeans(gasto_media ~ gastador_nombre, main="Antes de Diosi", data=ts_gastos_casa_week_treat[ts_gastos_casa_week_treat$treat==0,], xlab="", ylab="", ylim=c(0,70000))
@@ -295,7 +296,7 @@ x <- girafe_options(x,
   opts_zoom(min = 1, max = 3), opts_hover(css =tooltip_css))
 ```
 
-``` {r print-linea-tiempo-gastador-gastos , echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE,caption="Figura 4. Línea de Tiempo por Gastador y Gastos"}
+``` {r print-linea-tiempo-gastador-gastos , echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE,caption="Figura. Línea de Tiempo por Gastador y Gastos"}
 x
 ```
 
@@ -313,11 +314,58 @@ plot<-Gastos_casa %>%
       geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
       geom_vline(xintercept = as.Date("2019-03-23"),linetype = "dashed", color="red") +
       labs(y="Gastos (en miles)",x="Meses/Año", subtitle="Interlineado, incorporación de la Diosi") + 
-      ggtitle( "Figura 5. Suma de Gastos por Mes") +        
+      ggtitle( "Figura. Suma de Gastos por Mes") +        
       scale_x_date(breaks = "1 month", minor_breaks = "1 month", labels=scales::date_format("%m/%y")) +
       theme(axis.text.x = element_text(vjust = 0.5,angle = 45)) 
 plotly::ggplotly(plot)  
 ```
+
+
+
+```{r ts-month-gastos,echo=T,fig.align='center', echo=T, fig.pos='H', eval=T, message=FALSE, warning=F}
+plot2<-Gastos_casa %>%
+    dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
+    dplyr::mutate(fecha_week=strftime(fecha, format = "%Y-W%V")) %>%
+    dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))%>%
+    dplyr::group_by(day)%>%
+    summarise(gasto_total=sum(monto)/1000) %>%
+      ggplot2::ggplot(aes(x = day, y = gasto_total)) +
+      geom_line(size=1) +
+      sjPlot::theme_sjplot2() +
+      geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
+      geom_vline(xintercept = as.Date("2020-03-23"),linetype = "dashed", color="red") +
+      labs(y="Gastos (en miles)",x="Meses/Año", subtitle="Interlineado, incorporación de la Diosi") + 
+      ggtitle( "Figura. Suma de Gastos por Día") +        
+      scale_x_date(breaks = "1 month", minor_breaks = "1 week", labels=scales::date_format("%m/%y")) +
+      theme(axis.text.x = element_text(vjust = 0.5,angle = 45)) 
+plotly::ggplotly(plot2)  
+
+tsData <- Gastos_casa %>%
+    dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
+    dplyr::mutate(fecha_week=strftime(fecha, format = "%Y-W%V")) %>%
+    dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))%>%
+    dplyr::group_by(day)%>%
+    summarise(gasto_total=sum(monto))%>%
+    dplyr::mutate(covid=case_when(day>as.Date("2019-06-02")~1,TRUE~0))%>%
+    dplyr::mutate(covid=case_when(day>as.Date("2020-03-10")~covid+1,TRUE~covid))%>%
+    dplyr::mutate(covid=as.factor(covid))%>%
+  data.frame()
+```
+
+
+```{r descompone_la_serie,echo=T, echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE,caption="Figura. Serie descompuesta"}
+  
+tsData_gastos <-ts(tsData$gasto_total, frequency=7)
+mstsData_gastos <- forecast::msts(Gastos_casa$monto, seasonal.periods=c(7,30))
+  tsData_gastos = decompose(tsData_gastos)
+#plot(tsData_Santiago, title="Descomposición del número de casos confirmados para Santiago")
+forecast::autoplot(tsData_gastos, main="Descomposición de los Gastos Diarios")+
+    theme_bw()+ labs(x="Weeks")
+
+tsdata_gastos_trend<-cbind(tsData,trend=as.vector(tsData_gastos$trend))%>% na.omit()
+
+```
+
 
 <div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
 ```{r itsa2, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 6. Gasto Mensual"}
@@ -329,6 +377,8 @@ plotly::ggplotly(plot)
 #residual autocorrelation assumptions
 #TSA allows the model to account for baseline levels and trends present in the data therefore allowing us to attribute significant changes to the interruption
 #RDestimate(all~agecell,data=metro_region,cutpoint = 21)
+tsdata_gastos_trend<-cbind(tsData,trend=as.vector(tsData_gastos$trend))%>% na.omit()
+
 itsa_metro_region_quar2<-
         its.analysis::itsa.model(time = "day", depvar = "trend",data=tsdata_gastos_trend,
                                  interrupt_var = "covid", 
@@ -499,19 +549,6 @@ xlab("Date")+
   
 burn1d1 <- SuggestBurn(0.1, model1d1)
 
-  #plot(impact3d_ratio_resp)+
-  #xlab("Date")+
-  #ylab("Ratio")+
-  #scale_x_continuous(breaks=(c(seq(1,nrow(data15a64_rn),12),262)),
-  #                   labels=as.character(unlist(data15a64_rn[c(seq(1,nrow(data15a64_rn),12),262),"date"])))+
-  #theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=.5,size=11),
-  #      plot.caption = element_text(hjust = 0, face= "italic",size=9))+
-  ##scale_y_continuous(labels=scales::percent)+
-  #labs(caption="Note. The first panel shows the data and a counterfactual prediction for the post-treatment period (Blue dashed line);\nThe second panel shows the difference between observed data and counterfactual predictions;\nThe third panel adds up the pointwise contributions from the second panel;\nBlue area= Prediction intervals.")
-  
-#summary(impact2d1) 
-##summary(impact2d1,"report")
-#msts(data15a64_rn$hosp_trauma, seasonal.periods=c(7,365.25))
 ```
 
 ```{r nube-de-palabras-gastos, eval=T, fig.height=4, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura 10. Nube de Palabras, Observaciones"}
@@ -644,6 +681,7 @@ dplyr::right_join(fit_month_gasto_20,by="gasto2") %>%
 
 
 ```{r month-gasto-recategorizar2, echo=FALSE}
+library("tidytext")
 
 chat <- data.frame(Gastos_casa$obs) %>%
  dplyr::mutate(count_character= nchar(Gastos_casa.obs), 
@@ -667,7 +705,7 @@ chat$text2 <- stri_replace_all_regex(chat$Gastos_casa.obs,
                                   vectorize=FALSE)
 
 chat_clean <- chat %>%
-  unnest_tokens(word, text2) %>%
+  tidytext::unnest_tokens(word, text2) %>%
   anti_join(stop_words)
 
 
@@ -677,7 +715,6 @@ chat_clean <- chat_clean %>%
 chat_clean <- chat_clean %>%
   filter(!word %in% to_remove)
 
-library("tidytext")
 chat %>%
     tidytext::unnest_tokens(input = text2,
                   output = word) %>%
@@ -693,7 +730,7 @@ chat %>%
     coord_flip() +
 #    facet_wrap(~author, ncol = 2, scales = "free_y") +
     scale_x_reordered() +
-    ggtitle("Gastos detallados más usados")
+    ggtitle("Figura. Gastos detallados más usados")
 ```
 
 <br>
