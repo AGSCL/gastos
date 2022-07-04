@@ -36,7 +36,6 @@ jobs:
         shell: pwsh
         run: |
           Set-WinSystemLocale es-ES
-          Set-WinUserLanguageList es-ES
       - name: Install dependencies and Run
         run: |
           Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")

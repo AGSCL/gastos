@@ -113,8 +113,6 @@ if(!require(janitor)){install.packages("janitor")}
 
 if(!require(DT)){install.packages("DT")}
 if(!require(tidytext)){install.packages("tidytext")}
-if(!require(fable)){install.packages("fable")}
-
 
 require(ggplot2)
 require(dplyr)
@@ -122,7 +120,6 @@ require(data.table)
 require(zoo)
 require(sjPlot)
 require(maditr)
-require(fable)
 ```
 
 </div>
@@ -368,7 +365,7 @@ tsdata_gastos_trend<-cbind(tsData,trend=as.vector(tsData_gastos$trend))%>% na.om
 
 
 <div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
-```{r itsa2, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 6. Gasto Mensual"}
+```{r itsa2, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual"}
 #tsData_gastos$trend
 #Using the inputted variables, a Type-2 Sum Squares ANCOVA Lagged Dependent Variable model is fitted which estimates the difference in means between interrupted and non-interrupted time periods, while accounting for the lag of the dependent variable and any further specified covariates.
 #Typically such analyses use Auto-regressive Integrated Moving Average (ARIMA) models to handle the serial dependence of the residuals of a linear model, which is estimated either as part of the ARIMA process or through a standard linear regression modeling process [9,17]. All such time series methods enable the effect of the event to be separated from general trends and serial dependencies in time, thereby enabling valid statistical inferences to be made about whether an intervention has had an effect on a time series.
@@ -389,7 +386,7 @@ print(itsa_metro_region_quar2)
 
 Ahora con las tendencias descompuestas
  
-```{r linea-tiempo-gastador-gastos-tipo, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 7. Gasto Mensual"}
+```{r linea-tiempo-gastador-gastos-tipo, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual"}
 
 require(zoo)
 require(scales)
@@ -469,7 +466,7 @@ Gastos_casa %>%
     )
 ```
 
-```{r mstl, eval=T, fig.height=8, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura 8. Gasto descompuesto en Tendencias"}
+```{r mstl, eval=T, fig.height=8, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto descompuesto en Tendencias"}
 autoplot(forecast::mstl(Gastos_casa$monto, lambda = "auto",iterate=5000000,start = 
 lubridate::decimal_date(as.Date("2019-03-03"))))
  # scale_x_continuous(breaks = seq(0,400,by=30))
@@ -480,27 +477,7 @@ lubridate::decimal_date(as.Date("2019-03-03")))
 ```
 
 
-```{r tbats, eval=T, fig.height=8, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura 9. Proyección de Gasto Mensual en 2 meses más"}
-library(forecast)
-fit_month <- Gastos_casa %>%
-    dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
-    dplyr::mutate(fecha_month=strftime(fecha, format = "%Y-%m")) %>%
-    dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))%>%
-    dplyr::group_by(fecha_month)%>%
-     dplyr::summarise(gasto_total=sum(monto))%>%
-  data.frame()
-
-model_ets<-ets(fit_month$gasto_total, opt.crit = "mse")
-#forecast::autoplot(forecast(model_ets, h = 2))
-
-fit_tbats <- forecast::tbats(fit_month$gasto_total)
-autplot<-forecast::autoplot(forecast::forecast(fit_tbats, h=2)) +
-  theme_bw()
-autplot
-```
-
-
-```{r bsts, eval=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura 11. Proyección de Gasto Semanal Pre-Post COVID, Interrupción de Tiempo"}
+```{r bsts, eval=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Proyección de Gasto Semanal Pre-Post COVID, Interrupción de Tiempo"}
 library(bsts)
 library(CausalImpact)
 ts_week_covid<-  
