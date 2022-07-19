@@ -646,7 +646,7 @@ fit_month_gasto %>%
 
 fit_month_gasto_23 %>% 
 dplyr::right_join(fit_month_gasto_22,by="gasto2") %>%
-dplyr::right_join(fit_month_gasto_22,fit_month_gasto_21,by="gasto2") %>% 
+dplyr::right_join(fit_month_gasto_21,by="gasto2") %>% 
 dplyr::right_join(fit_month_gasto_20,by="gasto2") %>% 
   janitor::adorn_totals() %>% 
   #dplyr::select(-3) %>% 
