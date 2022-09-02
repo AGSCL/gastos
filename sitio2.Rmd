@@ -9,7 +9,71 @@ editor_options:
   chunk_output_type: console
 ---
 
+```{css zoom-lib-src, echo = FALSE}
+script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
+```
+
+```{js zoom-jquery, echo = FALSE}
+ $(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+      $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+      $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+      $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+  });
+  
+```
+
+```{css hideOutput-lib-src, echo = FALSE}
+<script src="hideOutput.js"></script> 
+```
+
+```{js hideOutput, echo = FALSE}
+$(document).ready(function() {    
+	$chunks = $('.fold');    
+	$chunks.each(function () {      // add button to source code chunks     
+	if ( $(this).hasClass('s') ) {       
+		$('pre.r', this).prepend("<div class=\"showopt\">Show Source</div><br style=\"line-height:22px;\"/>");
+       		$('pre.r', this).children('code').attr('class', 'folded');     
+       		}      // add button to output chunks     
+		if ( $(this).hasClass('o') ) {       
+			$('pre:not(.r)', this).has('code').prepend("<div class=\"showopt\">Show Output</div><br style=\"line-height:22px;\"/>");       
+			$('pre:not(.r)', this).children('code:not(r)').addClass('folded');        // add button to plots       
+			$(this).find('img').wrap('<pre class=\"plot\"></pre>');       
+			$('pre.plot', this).prepend("<div class=\"showopt\">Show Plot</div><br style=\"line-height:22px;\"/>");       
+			$('pre.plot', this).children('img').addClass('folded');      
+			}   
+});    // hide all chunks when document is loaded   
+	$('.folded').css('display', 'none')    // function to toggle the visibility   
+	$('.showopt').click(function() {     
+			var label = $(this).html();     
+			if (label.indexOf("Show") >= 0) {       
+				$(this).html(label.replace("Show", "Hide"));     
+			} else {
+			  $(this).html(label.replace("Hide", "Show"));     
+			}     
+	$(this).siblings('code, img').slideToggle('fast', 'swing');   
+	}); 
+}); 
+```
+
+```{=html}
 <style type="text/css">
+.showopt {   
+  background-color: #004c93;   color: #FFFFFF;    width: 100px;   height: 20px;   text-align: center;   vertical-align: middle !important;   float: right;   font-family: sans-serif;   border-radius: 8px; 
+  }
+.showopt:hover {     
+        background-color: #dfe4f2;
+        color: #004c93; 
+        }  
+pre.plot {   
+        background-color: white !important; 
+        } 
 .tablelines table, .tablelines td, .tablelines th {
         border: 1px solid black;
         }
@@ -20,27 +84,97 @@ editor_options:
     margin-left:auto; 
     margin-right:auto;
   }
-.table_wrapper{
-    display: block;g
-    overflow-x: auto;
-    white-space: nowrap;
+/* https://vivekjaiskumar.medium.com/css-is-and-not-selector-17c942ec83f :is()*/
+/* Applies to outputs that are not code other than R*/
+pre {
+  overflow-x: auto !important;
 }
-code.r{
-  font-size: 8px;
+pre code {
+  word-wrap: normal !important;
+  white-space: pre !important;
+}
+/*
+pre:not(.sourceCode) { 
+  white-space: nowrap !important;
+}
+*/
+.sourceCode { /* Important gives precedence  */
+  font-size: 10px !important;
+  line-height: 50% !important;
 }
 body{ /* Normal  */
       text-align: justify;
   }
 .superbigimage{
     overflow-y:scroll;
+    height:350px;
     white-space: nowrap;
+    overflow-x: auto; 
+    width:100%;
 }
 .superbigimage img{
     overflow-y: scroll;
     overflow-x: hidden;
 }
+.message { color:#446C6E; font-family: monospace;font-size: 10px; line-height: 110%; font-weight: bold;}
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 5px; text-align: justify;}
+div.red { background-color:#e6bab1; border-radius: 5px; padding: 5px; text-align: justify;}
+.pandoc-table { /* Should add !important; but it seems no necessary  */
+  margin-left:auto; /* To center */
+  margin-right:auto;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 11px;
+  overflow-y: auto;
+  max-height:450px !important;
+  white-space: nowrap;
+  overflow-x: auto; 
+  width:450px;
+}
+.pandoc-table th {/* header */
+text-align: center !important;
+font-size: 10px;
+padding: 0px;
+}
+.pandoc-table td {
+text-align: left !important;
+font-size: 9px;
+padding: 0px;
+}
+.pandoc-table caption {
+    text-align: left !important;
+    font-size: 11px !important;
+}
+.controlly{
+    overflow-y:scroll;
+    height:350px;
+    overflow-x: scroll; 
+}
 </style>
-
+```
+```{=html}
+<!-- We gotta do each function to hide code and outputs per section, by every ID, we gotta create a different function -->
+<script>
+function myFunction1() {
+    var x = document.getElementById("myDIV");
+    if (x.style.display === "none") {
+        x.style.display = "block";
+    } else {
+        x.style.display = "none";
+    }
+}
+</script>
+<script>
+function myFunction2() {
+    var x = document.getElementById("myDIV2");
+    if (x.style.display === "none") {
+        x.style.display = "block";
+    } else {
+        x.style.display = "none";
+    }
+}
+</script>
+```
 <div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
 
 ```{r setup, include=FALSE}
@@ -130,7 +264,10 @@ require(maditr)
 ```{r generar-base, include=F,warning=F, message=F}
 if(nchar(Sys.getenv("SUPERSECRET"))<2){
   Sys.setenv("SUPERSECRET"=as.character(read.table("secret_key.txt", quote="\"", comment.char="")))
-  }
+}
+if(nchar(Sys.getenv("SUPERSECRET"))<2){
+  try(Sys.setenv("SUPERSECRET"=as.character(read.table(paste0(gsub("/gastos","",dirname(rstudioapi::getActiveDocumentContext()$path)),"/secret_key.txt"), quote="\"", comment.char=""))))
+}
 
 path_sec<- paste0("https://docs.google.com/spreadsheets/d/",Sys.getenv("SUPERSECRET"),"/export?format=csv&id=",Sys.getenv("SUPERSECRET"),"&gid=1386184641")
 
@@ -139,15 +276,14 @@ Gastos_casa <- readr::read_csv(as.character(path_sec),
                               "link"),skip=1)
 ```
 
+::: controlly
 ```{r vista-preliminar, warning=F, message=F}
 Gastos_casa %>% 
   dplyr::select(-Tiempo,-link) %>%
-  dplyr::select(fecha, gasto, monto, gastador,obs) %>% tail(30) %>%
-  knitr::kable(.,format = "html", format.args = list(decimal.mark = ",", big.mark = "."),
-                   caption="Tabla 1. Gastos Casa (últimos 30 registros)", align =rep('c', 3)) %>%
-    kableExtra::kable_styling(bootstrap_options = c("striped", "hover"),font_size = 8) %>%
-    kableExtra::scroll_box(width = "100%", height = "300px")
+  dplyr::select(fecha, gasto, monto, gastador,obs) %>% tail(30) %>% 
+  knitr::kable(format = "markdown", size=12)
 ```
+:::
 
 
 ```{r head-gastos-casa, echo=FALSE, eval=F,echo=F}
@@ -549,6 +685,7 @@ wordcloud(words = df$word, freq = df$freq,
           colors=brewer.pal(8, "Dark2"), main="Figura 7. Nube de Palabras, Observaciones")
 ```
 
+::: controlly
 ```{r month-gasto-recategorizar, echo=T,fig.align='center', fig.pos='H', eval=T, message=FALSE, warning=F}
 fit_month_gasto <- Gastos_casa %>%
     dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
@@ -649,13 +786,11 @@ dplyr::right_join(fit_month_gasto_22,by="gasto2") %>%
 dplyr::right_join(fit_month_gasto_21,by="gasto2") %>% 
 dplyr::right_join(fit_month_gasto_20,by="gasto2") %>% 
   janitor::adorn_totals() %>% 
-  #dplyr::select(-3) %>% 
-  knitr::kable(format="html", caption="Tabla. Gastos promedio por ítem a contar del...",
-               col.names= c("Item","2023","2022","2021","2020")) %>% 
-  kableExtra::kable_classic(bootstrap_options = c("striped", "hover"),font_size = 12) %>%
-  kableExtra::scroll_box(width = "100%", height = "375px")
+  #dplyr::select(-3)%>% 
+  knitr::kable(format = "markdown", size=12)
 ```
-
+:::
+ 
 
 ```{r month-gasto-recategorizar2, echo=FALSE}
 library("tidytext")
@@ -804,16 +939,18 @@ arima_optimal_uf = forecast::auto.arima(ts_uf_proy)
     ))
 
 fr_fit_tbats_uf<-forecast::forecast(arima_optimal_uf, h=298)
+```
 
+::: controlly                                                      
+```{r 1-5-2, echo=T, paged.print=TRUE,eval=T}
 dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats)),variable) %>% dplyr::summarise(max=max(value)) %>% 
 dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_uf)),variable) %>% dplyr::summarise(max=max(value)),by="variable") %>% 
   dplyr::mutate(variable=factor(variable,levels=c("Lo.95","Lo.80","Point.Forecast","Hi.80","Hi.95"))) %>% 
   dplyr::arrange(variable) %>% 
-  knitr::kable(format="html", caption="Tabla. Estimación UF (de aquí a 298 días) según cálculos de gastos mensuales",
-               col.names= c("Item","UF Proyectada (TBATS)","UF Proyectada (ARIMA)")) %>% 
-  kableExtra::kable_classic(bootstrap_options = c("striped", "hover"),font_size = 12) %>%
-  kableExtra::scroll_box(width = "100%", height = "375px")
+  knitr::kable(format="markdown", caption="Tabla. Estimación UF (de aquí a 298 días) según cálculos de gastos mensuales",
+               col.names= c("Item","UF Proyectada (TBATS)","UF Proyectada (ARIMA)"))
 ```
+:::
 
 <br>
 
@@ -906,6 +1043,7 @@ autplo2t2<-
 autplo2t2
 ```
 
+::: controlly
 ```{r 3, echo=T, paged.print=TRUE,eval=T}
 fr_fit_tbats_m<-forecast::forecast(fit_tbats_m, h=12)
 fr_fit_tbats_m2<-forecast::forecast(arima_optimal, h=12)
@@ -915,10 +1053,55 @@ dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_m3)),va
 dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_m)),variable) %>% dplyr::summarise(max=max(value)),by="variable") %>% 
   dplyr::mutate(variable=factor(variable,levels=c("Lo.95","Lo.80","Point.Forecast","Hi.80","Hi.95"))) %>% 
   dplyr::arrange(variable) %>% 
-  knitr::kable(format="html", caption="Tabla. Estimación en miles de la plata a gastar en el futuro (de aquí a 12 meses) según cálculos de gastos mensuales",
-               col.names= c("Item","Modelo ARIMA con regresor (UF)","Modelo ARIMA sin regresor","Modelo TBATS")) %>% 
-  kableExtra::kable_classic(bootstrap_options = c("striped", "hover"),font_size = 12) %>%
-  kableExtra::scroll_box(width = "100%", height = "375px")
+  knitr::kable(format="markdown", caption="Estimación en miles de la plata a gastar en el futuro (de aquí a 12 meses) según cálculos de gastos mensuales",
+               col.names= c("Item","Modelo ARIMA con regresor (UF)","Modelo ARIMA sin regresor","Modelo TBATS")) 
+```
+:::
+
+<br>
+
+# 4. Gastos mensuales (resumen manual)
+
+::: controlly
+```{r 4, echo=T, paged.print=TRUE,eval=T}
+path_sec2<- paste0("https://docs.google.com/spreadsheets/d/",Sys.getenv("SUPERSECRET"),"/export?format=csv&id=",Sys.getenv("SUPERSECRET"),"&gid=847461368")
+
+Gastos_casa_mensual_2022 <- readr::read_csv(as.character(path_sec2),
+                #col_names = c("Tiempo", "gasto", "fecha", "obs", "monto", "gastador","link"),
+                skip=0)
+
+head(Gastos_casa_mensual_2022,5) %>% 
+  knitr::kable("markdown",caption="Resumen mensual, primeras 5 observaciones")
+```
+:::
+
+<br>
+
+```{r linea-tiempo-gastador-gastos-manual, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual"}
+(
+Gastos_casa_mensual_2022 %>% 
+    reshape2::melt(id.var=c("n","mes_ano")) %>%
+  dplyr::mutate(gastador=as.factor(variable)) %>% 
+  dplyr::select(-variable) %>% 
+ ggplot2::ggplot(aes(x = n, y = value, color=gastador)) +
+  scale_color_manual(name="Gastador", values=c("red", "blue"))+
+  geom_line(size=1) +
+  #geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
+  labs(y="Gastos (en miles)",x="Meses", subtitle="Azul= Tami; Rojo= Andrés") +
+  ggtitle( "Gastos Mensuales (total manual)") +
+  scale_y_continuous(labels = f <- function(x) paste0(x/1000)) + 
+#  scale_color_manual(name = "Gastador", values= c("blue", "red"), labels = c("Tami", "Andrés")) +
+#  scale_x_yearweek(breaks = "1 month", minor_breaks = "1 week", labels=date_format("%m/%y")) +
+ # guides(color = F)+
+  sjPlot::theme_sjplot2() +
+  theme(axis.text.x = element_text(vjust = 0.5,angle = 35)) +
+  theme(
+    panel.border = element_blank(), 
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(), 
+    axis.line = element_line(colour = "black")
+    )
+) %>% ggplotly()
 ```
 
 <br>
@@ -938,10 +1121,17 @@ dplyr::select(
   DT::datatable(filter = 'top', colnames = c('Row number' =1,'Variable' = 2, 'Percentage'= 3),
               caption = htmltools::tags$caption(
         style = 'caption-side: top; text-align: left;',
-        '', htmltools::em('Paquetes estadísticos utilizados')),
+        '', htmltools::em('Packages')),
       options=list(
 initComplete = htmlwidgets::JS(
-      "function(settings, json) {",
-      "$(this.api().tables().body()).css({'font-size': '80%'});",
-      "}")))
+        "function(settings, json) {",
+        "$(this.api().tables().body()).css({
+            'font-family': 'Helvetica Neue',
+            'font-size': '50%', 
+            'code-inline-font-size': '15%', 
+            'white-space': 'nowrap',
+            'line-height': '0.75em',
+            'min-height': '0.5em'
+            });",#;
+        "}")))
 ```
