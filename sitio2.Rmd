@@ -787,7 +787,7 @@ dplyr::right_join(fit_month_gasto_21,by="gasto2") %>%
 dplyr::right_join(fit_month_gasto_20,by="gasto2") %>% 
   janitor::adorn_totals() %>% 
   #dplyr::select(-3)%>% 
-  knitr::kable(format = "markdown", size=12)
+  knitr::kable(format = "markdown", size=12, col.names= c("Item","2023","2022","2021","2020"))
 ```
 :::
  
