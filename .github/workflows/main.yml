@@ -42,6 +42,7 @@ jobs:
           Sys.setlocale("LC_CTYPE", "Spanish_Chile.1252")
           Sys.setlocale("LC_MONETARY", "Spanish_Chile.1252")
           Sys.setlocale("LC_TIME", "Spanish_Chile.1252")
+          if(!require(devtools)){install.packages("devtools", type = "win.binary", dependencies=T)}
           install.packages(c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud","autoplotly",
           "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact","bsts","DT",
           "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis","lubridate", "tidytext"))
