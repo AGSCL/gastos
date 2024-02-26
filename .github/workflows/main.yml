@@ -3,7 +3,8 @@ name: Actualiza_gastos
 on:
   push:
   schedule:
-    - cron: '0 0 * * MON' #http://www.cronmaker.com/?0 https://crontab.guru/every-monday #https://github.com/actions/cache  https://github.com/actions/cache/blob/main/examples.md#r---renv
+    - cron: '0 0 * * MON'
+
 jobs: 
   build:
     runs-on: windows-latest
@@ -17,43 +18,58 @@ jobs:
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: true
       RSPM: ${{ matrix.config.rspm }}
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-      SUPERSECRET: ${{ secrets.SUPERSECRET }} #https://docs.github.com/es/actions/security-guides/encrypted-secrets
+      SUPERSECRET: ${{ secrets.SUPERSECRET }}
     steps:
-      - run: echo "$GITHUB_CONTEXT"
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      
+      - name: Cache R packages
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: ${{ runner.os }}-r-${{ hashFiles('**/DESCRIPTION') }}
+          restore-keys: ${{ runner.os }}-r-
+      
       - name: Set up R ${{ matrix.r-version }}		
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ matrix.r-version }}
+
       - uses: r-lib/actions/setup-pandoc@v1
+
       - name: Create and populate .Renviron file
         run: |
           echo SUPERSECRET="$SUPERSECRET" >> ~/.Renviron
         shell: bash
+
       - name: Set locale Spanish
         shell: pwsh
         run: |
           Set-WinSystemLocale es-ES
+
       - name: Install dependencies and Run
         run: |
           Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
           Sys.setlocale("LC_CTYPE", "Spanish_Chile.1252")
           Sys.setlocale("LC_MONETARY", "Spanish_Chile.1252")
           Sys.setlocale("LC_TIME", "Spanish_Chile.1252")
-          if(!require(devtools)){install.packages("devtools", type = "win.binary", dependencies=T)}
-          install.packages(c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud","autoplotly",
-          "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact","bsts","DT",
-          "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis","lubridate", "tidytext"))
+          packages <- c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud","autoplotly",
+                        "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact",
+                        "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis",
+                        "lubridate", "tidytext")
+          new.packages <- packages[!packages %in% installed.packages()[,"Package"]]
+          if(length(new.packages)) install.packages(new.packages, dependencies = TRUE)
           rmarkdown::render("sitio2.Rmd")
         shell: Rscript {0}
+
       - name: Commit files
         run: |
           git config --local user.email "${{ github.actor }}@users.noreply.github.com"
           git config --local user.name "${{ github.actor }}"
           git add .
           git commit --allow-empty -am "AUTO-GH ACTION: ${{ github.workflow }} $(date)"
+
       - name: Push changes to gh-pages
         uses: ad-m/github-push-action@master
         with:
