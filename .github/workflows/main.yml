@@ -42,8 +42,15 @@ jobs:
           Set-WinSystemLocale es-ES
 
       - name: Print R_LIBS_USER
-        run: echo "R_LIBS_USER=${{ env.R_LIBS_USER }}"      
-        
+        run: echo "R_LIBS_USER=${{ env.R_LIBS_USER }}"      #R_LIBS_USER=D:\a\_temp\Library
+
+      - name: Cache R packages
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: ${{ runner.os }}-r-${{ hashFiles('**/DESCRIPTION') }}
+          restore-keys: ${{ runner.os }}-r-
+  
       - name: Install dependencies and Run
         run: |
           Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
