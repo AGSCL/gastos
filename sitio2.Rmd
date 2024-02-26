@@ -859,17 +859,18 @@ uf19 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2019.htm")%>% 
 uf20 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2020.htm")%>% rvest::html_nodes("table")
 uf21 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2021.htm")%>% rvest::html_nodes("table")
 uf22 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2022.htm")%>% rvest::html_nodes("table")
+uf23 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2023.htm")%>% rvest::html_nodes("table")
 
-tryCatch(uf23 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2023.htm")%>% rvest::html_nodes("table"),
+tryCatch(uf24 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2024.htm")%>% rvest::html_nodes("table"),
     error = function(c) {
-      uf23b <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
+      uf24b <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
       
     }
   )
 
-tryCatch(uf23 <-uf23[[length(uf23)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1),
+tryCatch(uf24 <-uf24[[length(uf24)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1),
     error = function(c) {
-      uf23 <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
+      uf24 <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
     }
 )
 
@@ -884,7 +885,9 @@ cbind.data.frame(anio= 2020, uf20[[length(uf20)]] %>% rvest::html_table() %>% da
 cbind.data.frame(anio= 2021, uf21[[length(uf21)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
 
 cbind.data.frame(anio= 2022, uf22[[length(uf22)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
-cbind.data.frame(anio= 2023, uf23)
+
+cbind.data.frame(anio= 2023, uf23[[length(uf23)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
+cbind.data.frame(anio= 2024, uf24)
 )
 
 uf_serie_corrected<-
