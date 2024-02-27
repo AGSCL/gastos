@@ -51,7 +51,7 @@ jobs:
           key: ${{ runner.os }}-r-${{ hashFiles('**/DESCRIPTION') }}
           restore-keys: ${{ runner.os }}-r-
   
-      - name: Install dependencies and Run
+      - name: Install dependencies
         run: |
           Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
           Sys.setlocale("LC_CTYPE", "Spanish_Chile.1252")
@@ -63,9 +63,14 @@ jobs:
                         "lubridate", "tidytext")
           new.packages <- packages[!packages %in% installed.packages()[,"Package"]]
           if(length(new.packages)) install.packages(new.packages, dependencies = TRUE)
-          rmarkdown::render("sitio2.Rmd")
         shell: Rscript {0}
 
+      - name: Run script
+        if: always()
+        run: |
+          rmarkdown::render("sitio2.Rmd")
+        shell: Rscript {0}
+        
       - name: Commit files
         run: |
           git config --local user.email "${{ github.actor }}@users.noreply.github.com"
