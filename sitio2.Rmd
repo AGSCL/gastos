@@ -147,7 +147,7 @@ padding: 0px;
 }
 .controlly{
     overflow-y:scroll;
-    height:350px;
+    height:351px;
     overflow-x: scroll; 
 }
 </style>
