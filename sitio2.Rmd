@@ -740,12 +740,20 @@ fit_month_gasto <- Gastos_casa %>%
     dplyr::summarise(gasto_total=sum(monto, na.rm = T)/1000)%>%
   data.frame() %>% na.omit()
 
+fit_month_gasto_24<-
+fit_month_gasto %>% 
+    #dplyr::filter()
+    dplyr::filter(grepl("2024",fecha_month)) %>% 
+    #sacar el ultimo mes
+    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
+    dplyr::group_by(gasto2) %>% 
+    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
+  data.frame()%>% ungroup()
+
 fit_month_gasto_23<-
 fit_month_gasto %>% 
     #dplyr::filter()
     dplyr::filter(grepl("2023",fecha_month)) %>% 
-    #sacar el ultimo mes
-    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
     dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
   data.frame()%>% ungroup()
@@ -754,8 +762,6 @@ fit_month_gasto_22<-
 fit_month_gasto %>% 
     #dplyr::filter()
     dplyr::filter(grepl("2022",fecha_month)) %>% 
-    #sacar el ultimo mes
-    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
     dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
   data.frame()%>% ungroup()
@@ -763,9 +769,7 @@ fit_month_gasto %>%
 fit_month_gasto_21<-
 fit_month_gasto %>% 
     #dplyr::filter()
-    dplyr::filter(grepl("2021|2022",fecha_month)) %>% 
-    #sacar el ultimo mes
-    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
+    dplyr::filter(grepl("2021",fecha_month)) %>% 
     dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
   data.frame()%>% ungroup()
@@ -775,19 +779,18 @@ fit_month_gasto_20<-
 fit_month_gasto %>% 
     #dplyr::filter()
     dplyr::filter(grepl("202",fecha_month)) %>% 
-    #sacar el ultimo mes
-    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
     dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
   data.frame() %>% ungroup()
 
-fit_month_gasto_23 %>% 
+fit_month_gasto_24 %>% 
+dplyr::right_join(fit_month_gasto_23,by="gasto2") %>%
 dplyr::right_join(fit_month_gasto_22,by="gasto2") %>%
 dplyr::right_join(fit_month_gasto_21,by="gasto2") %>% 
 dplyr::right_join(fit_month_gasto_20,by="gasto2") %>% 
   janitor::adorn_totals() %>% 
   #dplyr::select(-3)%>% 
-  knitr::kable(format = "markdown", size=12, col.names= c("Item","2023","2022","2021","2020"))
+  knitr::kable(format = "markdown", size=12, col.names= c("Item","2024","2023","2022","2021","2020"))
 ```
 :::
  
