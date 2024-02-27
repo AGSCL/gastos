@@ -254,6 +254,21 @@ require(data.table)
 require(zoo)
 require(sjPlot)
 require(maditr)
+
+theme_custom <- function() {
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+}
 ```
 
 </div>
@@ -400,7 +415,7 @@ gg <- Gastos_casa %>%
                        ggiraph::geom_point_interactive(aes(x = fecha_simp, y = monto_total, color=as.factor(gastador_nombre),tooltip=tooltip),size = 1) +
   #geom_text(aes(x = fech_ing_qrt, y = perc_dup-0.05, label = paste0(n)), vjust = -1,hjust = 0, angle=45, size=3) +
  # guides(color = F)+
-  sjPlot::theme_sjplot2() +
+  theme_custom() +
   geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
   labs(y="Gastos (en miles)",x="Semanas y Meses", subtitle="Interlineado, incorporación de la Diosi; Azul= Tami; Rojo= Andrés") + ggtitle( "Figura 4. Gastos por Gastador") +
   scale_y_continuous(labels = f <- function(x) paste0(x/1000)) + 
@@ -443,7 +458,7 @@ plot<-Gastos_casa %>%
       ggplot2::ggplot(aes(x = month, y = gasto_total)) +
       geom_point()+
       geom_line(size=1) +
-      sjPlot::theme_sjplot2() +
+      theme_custom() +
       geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
       geom_vline(xintercept = as.Date("2019-03-23"),linetype = "dashed", color="red") +
       labs(y="Gastos (en miles)",x="Meses/Año", subtitle="Interlineado, incorporación de la Diosi") + 
@@ -464,7 +479,7 @@ plot2<-Gastos_casa %>%
     summarise(gasto_total=sum(monto)/1000) %>%
       ggplot2::ggplot(aes(x = day, y = gasto_total)) +
       geom_line(size=1) +
-      sjPlot::theme_sjplot2() +
+      theme_custom() +
       geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
       geom_vline(xintercept = as.Date("2020-03-23"),linetype = "dashed", color="red") +
       labs(y="Gastos (en miles)",x="Meses/Año", subtitle="Interlineado, incorporación de la Diosi") + 
@@ -592,7 +607,7 @@ Gastos_casa %>%
   scale_color_manual(name = "Gastador", values= c("blue", "red"), labels = c("Tami", "Andrés")) +
   scale_x_yearweek(breaks = "1 month", minor_breaks = "1 week", labels=date_format("%m/%y")) +
   guides(color = F)+
-  sjPlot::theme_sjplot2() +
+  theme_custom() +
   theme(axis.text.x = element_text(vjust = 0.5,angle = 35)) +
   theme(
     panel.border = element_blank(), 
@@ -1099,7 +1114,7 @@ Gastos_casa_mensual_2022 %>%
 #  scale_color_manual(name = "Gastador", values= c("blue", "red"), labels = c("Tami", "Andrés")) +
 #  scale_x_yearweek(breaks = "1 month", minor_breaks = "1 week", labels=date_format("%m/%y")) +
  # guides(color = F)+
-  sjPlot::theme_sjplot2() +
+  theme_custom() +
   theme(axis.text.x = element_text(vjust = 0.5,angle = 35)) +
   theme(
     panel.border = element_blank(), 
