@@ -574,7 +574,6 @@ Gastos_casa %>%
     dplyr::mutate(fecha2=strftime(fecha, format = "%Y-W%V")) %>%
     dplyr::mutate(gastador=ifelse(gastador=="Andrés",1,0)) %>%
     dplyr::mutate(treat=ifelse(fecha2>"2019-W26",1,0)) %>% 
-   dplyr::mutate(gasto= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
     dplyr::mutate(gasto= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
                   gasto=="aspiradora"~"Electrodomésticos/mantención casa",
                   gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
@@ -662,8 +661,6 @@ Gastos_casa %>%
   #stat_summary(geom = "line", fun.y = median, size = 1, alpha=0.5, aes(color="blue")) +
   geom_line(size=1) +
   facet_grid(gasto~.)+
-  #geom_text(aes(x = fech_ing_qrt, y = perc_dup-0.05, label = paste0(n)), vjust = -1,hjust = 0, angle=45, size=3) +
-
   geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
   labs(y="Gastos (en miles)",x="Semanas y Meses", subtitle="Interlineado, incorporación de la Diosi; Azul= Tami; Rojo= Andrés") +
   ggtitle( "Figura 6. Gastos Semanales por Gastador e ítem (media)") +
