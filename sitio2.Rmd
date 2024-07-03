@@ -502,16 +502,44 @@ tsData <- Gastos_casa %>%
 
 
 ```{r descompone_la_serie,echo=T, echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE,caption="Figura. Serie descompuesta"}
-  
+
 tsData_gastos <-ts(tsData$gasto_total, frequency=7)
 mstsData_gastos <- forecast::msts(Gastos_casa$monto, seasonal.periods=c(7,30))
-  tsData_gastos = decompose(tsData_gastos)
-#plot(tsData_Santiago, title="Descomposición del número de casos confirmados para Santiago")
-forecast::autoplot(tsData_gastos, main="Descomposición de los Gastos Diarios")+
-    theme_bw()+ labs(x="Weeks")
+
+tsData_gastos = decompose(tsData_gastos)
 
 tsdata_gastos_trend<-cbind(tsData,trend=as.vector(tsData_gastos$trend))%>% na.omit()
 
+# Assuming your time series starts on "2019-03-03"
+start_date <- as.Date("2019-03-03")
+frequency <- 7  # Weekly data
+num_periods <- length(tsData_gastos$x)  # Total number of periods in your time series
+
+# Generate sequence of dates
+dates <- tsData$day# seq.Date(from = start_date, by = "day", length.out = num_periods)
+
+# Create a data frame from the decomposed time series object
+tsData_gastos_df <- data.frame(
+  day = dates,
+  Actual = as.numeric(tsData_gastos$x),
+  Seasonal = as.numeric(tsData_gastos$seasonal),
+  Trend = as.numeric(tsData_gastos$trend),
+  Random = as.numeric(tsData_gastos$random)
+)
+
+tsData_gastos_long <- tsData_gastos_df %>%
+  pivot_longer(cols = c("Actual", "Seasonal", "Trend", "Random"), 
+               names_to = "Component", values_to = "Value")
+
+# Plotting with facet_wrap
+ggplot(tsData_gastos_long, aes(x = day, y = Value)) +
+  geom_line() +
+  theme_bw() + 
+  labs(title = "Descomposición de los Gastos Diarios", x = "Date", y = "Value") +
+  scale_x_date(date_breaks = "3 months", date_labels = "%m %Y") +
+  facet_wrap(~ Component, scales = "free_y", ncol=1) +
+theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(strip.text = element_text(size = 12))
 ```
 
 
@@ -547,48 +575,84 @@ Gastos_casa %>%
     dplyr::mutate(gastador=ifelse(gastador=="Andrés",1,0)) %>%
     dplyr::mutate(treat=ifelse(fecha2>"2019-W26",1,0)) %>% 
    dplyr::mutate(gasto= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
-    gasto=="aspiradora"~"electrodomésticos/mantención casa",
-                                            gasto=="Plata fiestas patrias basureros"~"donaciones/regalos",
-                                            gasto=="Tina"~"electrodomésticos/mantención casa",
-                                            gasto=="Nexium"~"Farmacia",
-                                            gasto=="donaciones"~"donaciones/regalos",
-                                            gasto=="Regalo chocolates"~"donaciones/regalos",
-                                            gasto=="filtro piscina msp"~"electrodomésticos/mantención casa",
-                                            gasto=="Chromecast"~"electrodomésticos/mantención casa",
-                                            gasto=="Muebles ratan"~"electrodomésticos/mantención casa",
-                                            gasto=="Vacuna Influenza"~"Farmacia",
-                                            gasto=="Easy"~"electrodomésticos/mantención casa",
-                                            gasto=="Sopapo"~"electrodomésticos/mantención casa",
-                                            gasto=="filtro agua"~"electrodomésticos/mantención casa",
-                                            gasto=="ropa tami"~"donaciones/regalos",
-                                            gasto=="yaz"~"Farmacia",
-                                            gasto=="Yaz"~"Farmacia",
-                                            gasto=="Remedio"~"Farmacia",
-                                            gasto=="Entel"~"VTR",
-                                            gasto=="Kerosen"~"Gas/Bencina",
-                                            gasto=="Parafina"~"Gas/Bencina",
-                                            gasto=="Plata basurero"~"donaciones/regalos",
-                                            gasto=="Matri Andrés Kogan"~"donaciones/regalos",
-                                            gasto=="Wild Protein"~"Comida",
-                                            gasto=="Granola Wild Foods"~"Comida",
-                                            gasto=="uber"~"Transporte",
-                                            gasto=="Uber Reñaca"~"Transporte",
-                                            gasto=="filtro piscina mspa"~"electrodomésticos/mantención casa",
-                                            gasto=="Limpieza Alfombra"~"electrodomésticos/mantención casa",
-                                            gasto=="Aspiradora"~"electrodomésticos/mantención casa",
-                                            gasto=="Limpieza alfombras"~"electrodomésticos/mantención casa",
-                                            gasto=="Pila estufa"~"electrodomésticos/mantención casa",
-                                            gasto=="Reloj"~"electrodomésticos/mantención casa",
-                                            gasto=="Arreglo"~"electrodomésticos/mantención casa",
-                                            gasto=="Pan Pepperino"~"Comida",
-                                            gasto=="Cookidoo"~"Comida",
-                                            gasto=="remedios"~"Farmacia",
-                                            gasto=="Bendina Reñaca"~"Gas/Bencina",
-                                            gasto=="Bencina Reñaca"~"Gas/Bencina",
-                                            gasto=="Vacunas Influenza"~"Farmacia",
-                                            gasto=="Remedios"~"Farmacia",
-                                            gasto=="Plata fiestas patrias basureros"~"donaciones/regalos",
-                                        T~gasto)) %>% 
+    dplyr::mutate(gasto= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
+                  gasto=="aspiradora"~"Electrodomésticos/mantención casa",
+                  gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
+                  gasto=="Tina"~"Electrodomésticos/mantención casa",
+                  gasto=="Nexium"~"Farmacia",
+                  gasto=="donaciones"~"Donaciones/regalos",
+                  gasto=="Regalo chocolates"~"Donaciones/regalos",
+                  gasto=="filtro piscina msp"~"Electrodomésticos/mantención casa",
+                  gasto=="Chromecast"~"Electrodomésticos/mantención casa",
+                  gasto=="Muebles ratan"~"Electrodomésticos/mantención casa",
+                  gasto=="Vacuna Influenza"~"Farmacia",
+                  gasto=="Easy"~"Electrodomésticos/mantención casa",
+                  gasto=="Sopapo"~"Electrodomésticos/mantención casa",
+                  gasto=="filtro agua"~"Electrodomésticos/mantención casa",
+                  gasto=="ropa tami"~"Donaciones/regalos",
+                  gasto=="yaz"~"Farmacia",
+                  gasto=="Yaz"~"Farmacia",
+                  gasto=="Remedio"~"Farmacia",
+                  gasto=="Entel"~"VTR",
+                  gasto=="Kerosen"~"Gas/Bencina",
+                  gasto=="Parafina"~"Gas/Bencina",
+                  gasto=="Plata basurero"~"Donaciones/regalos",
+                  gasto=="Matri Andrés Kogan"~"Donaciones/regalos",
+                  gasto=="Wild Protein"~"Comida",
+                  gasto=="Granola Wild Foods"~"Comida",
+                  gasto=="uber"~"Transporte",
+                  gasto=="Uber Reñaca"~"Transporte",
+                  gasto=="filtro piscina mspa"~"Electrodomésticos/mantención casa",
+                  gasto=="Limpieza Alfombra"~"Electrodomésticos/mantención casa",
+                  gasto=="Aspiradora"~"Electrodomésticos/mantención casa",
+                  gasto=="Limpieza alfombras"~"Electrodomésticos/mantención casa",
+                  gasto=="Pila estufa"~"Electrodomésticos/mantención casa",
+                  gasto=="Reloj"~"Electrodomésticos/mantención casa",
+                  gasto=="Arreglo"~"Electrodomésticos/mantención casa",
+                  gasto=="Pan Pepperino"~"Comida",
+                  gasto=="Cookidoo"~"Comida",
+                  gasto=="remedios"~"Farmacia",
+                  gasto=="Bendina Reñaca"~"Gas/Bencina",
+                  gasto=="Bencina Reñaca"~"Gas/Bencina",
+                  gasto=="Vacunas Influenza"~"Farmacia",
+                  gasto=="Remedios"~"Farmacia",
+                  gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
+                  #2024
+                  gasto=="cartero"~"Correo",
+                  gasto=="correo"~"Correo",
+                  gasto=="Gaviscón y Paracetamol"~"Farmacia",
+                  gasto=="Regalo Matri Cony"~"Donaciones/regalos",
+                  gasto=="Regalo Matri Chepa"~"Donaciones/regalos",
+                  gasto=="Aporte Basureros"~"Donaciones/regalos",
+                  gasto=="donación"~"Donaciones/regalos",
+                  gasto=="Plata Reciclaje y Basurero"~"Donaciones/regalos",
+                  gasto=="basureros"~"Donaciones/regalos",
+                  gasto=="Microondas regalo"~"Donaciones/regalos",
+                  gasto=="Cruz Verde"~"Farmacia",
+                  gasto=="Remedios Covid"~"Farmacia",      
+                  gasto=="nacho"~"Electrodomésticos/mantención casa",
+                  gasto=="Jardinero"~"Electrodomésticos/mantención casa",
+                  gasto=="mantencion toyotomi"~"Electrodomésticos/mantención casa",
+                  gasto=="Cámaras Seguridad M.Barrios"~"Electrodomésticos/mantención casa",      
+                  gasto=="Uber cumple papá"~"Transporte",
+                  gasto=="Uber"~"Transporte",
+                  gasto=="Uber Matri Cony"~"Transporte",
+                  gasto=="Bencina + tag"~"Gas/Bencina",
+                  gasto=="Bencina + Tag cumple Delox"~"Gas/Bencina",
+                  gasto=="Bencina + peajes Maite"~"Gas/Bencina",
+                  gasto=="Crunchyroll"~"Netflix",
+                  gasto=="Crunchyroll"~"Netflix",
+                  gasto=="Incoludido"~"Enceres",
+                  gasto=="Cortina baño"~"Electrodomésticos/mantención casa",
+                  gasto=="Forro cortina ducha"~"Electrodomésticos/mantención casa",
+                  gasto=="Brussels"~"Comida",
+                  gasto=="Tres toques"~"Enceres",
+                  gasto=="Transferencia"~"Otros",
+                  gasto=="prestamo"~"Otros",
+                  gasto=="Préstamo Andrés"~"Otros",
+                  gasto=="mouse"~"Otros",
+                  gasto=="lamina"~"Otros",
+      T~gasto)) %>% 
     dplyr::group_by(gastador, fecha,gasto, .drop=F) %>%
     #dplyr::mutate(fecha_simp=week(parse_date(fecha))) %>% 
 #    dplyr::mutate(fecha_simp=tsibble::yearweek(fecha)) %>%#después de  diosi. Junio 24, 2019	
@@ -618,13 +682,31 @@ Gastos_casa %>%
 ```
 
 ```{r mstl, eval=T, fig.height=8, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto descompuesto en Tendencias"}
-autoplot(forecast::mstl(Gastos_casa$monto, lambda = "auto",iterate=5000000,start = 
-lubridate::decimal_date(as.Date("2019-03-03"))))
- # scale_x_continuous(breaks = seq(0,400,by=30))
-msts <- forecast::msts(Gastos_casa$monto,seasonal.periods = c(7,30.5,365.25),start = 
+# Apply MSTL decomposition
+mstl_data_autplt <- forecast::mstl(Gastos_casa$monto, lambda = "auto",iterate=5000000,start = 
 lubridate::decimal_date(as.Date("2019-03-03")))
-#tbats <- forecast::tbats(msts,use.trend = FALSE)
-#plot(tbats, main="Multiple Season Decomposition")
+
+# Convert the decomposed time series to a data frame
+mstl_df <- data.frame(
+  Date = as.Date(Gastos_casa$fecha, format="%d/%m/%Y"),
+  Data = as.numeric(mstl_data_autplt[, "Data"]),
+  Trend = as.numeric(mstl_data_autplt[, "Trend"]),
+  Remainder = as.numeric(mstl_data_autplt[, "Remainder"])
+)
+
+# Reshape the data frame for ggplot2
+mstl_long <- mstl_df %>%
+  pivot_longer(cols = -Date, names_to = "Component", values_to = "Value")
+
+# Plotting with ggplot2
+ggplot(mstl_long, aes(x = Date, y = Value)) +
+  geom_line() +
+  theme_bw() + 
+  labs(title = "Descomposición MSTL", x = "Fecha", y = "Valor") +
+  scale_x_date(date_breaks = "3 months", date_labels = "%m-%Y") +
+  facet_wrap(~ Component, scales = "free_y", ncol = 1) +
+  theme(strip.text = element_text(size = 12),
+        axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
 
@@ -706,49 +788,84 @@ fit_month_gasto <- Gastos_casa %>%
     dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
     dplyr::mutate(fecha_month=strftime(fecha, format = "%Y-%m")) %>%
     dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))%>%
-  dplyr::mutate(gasto2= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
-    gasto=="aspiradora"~"electrodomésticos/mantención casa",
-                                            gasto=="Plata fiestas patrias basureros"~"donaciones/regalos",
-                                            gasto=="Tina"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Nexium"~"Farmacia",
-                                            gasto=="donaciones"~"donaciones/regalos",
-                                            gasto=="Regalo chocolates"~"donaciones/regalos",
-                                            gasto=="filtro piscina msp"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Chromecast"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Muebles ratan"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Vacuna Influenza"~"Farmacia",
-                                            gasto=="Easy"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Sopapo"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="filtro agua"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="ropa tami"~"donaciones/regalos",
-                                            gasto=="yaz"~"Farmacia",
-                                            gasto=="Yaz"~"Farmacia",
-                                            gasto=="Remedio"~"Farmacia",
-                                            gasto=="Entel"~"VTR",
-                                            gasto=="Kerosen"~"Gas/Bencina",
-                                            gasto=="Parafina"~"Gas/Bencina",
-                                            gasto=="Plata basurero"~"donaciones/regalos",
-                                            gasto=="Matri Andrés Kogan"~"donaciones/regalos",
-                                            gasto=="Wild Protein"~"Comida",
-                                            gasto=="Granola Wild Foods"~"Comida",
-                                            gasto=="uber"~"Otros",
-                                            gasto=="Uber Reñaca"~"Otros",
-                                            gasto=="filtro piscina mspa"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Limpieza Alfombra"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Aspiradora"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Limpieza alfombras"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Pila estufa"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Reloj"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Arreglo"~"Electrodomésticos/ Mantención casa",
-                                            gasto=="Pan Pepperino"~"Comida",
-                                            gasto=="Cookidoo"~"Comida",
-                                            gasto=="remedios"~"Farmacia",
-                                            gasto=="Bendina Reñaca"~"Gas/Bencina",
-                                            gasto=="Bencina Reñaca"~"Gas/Bencina",
-                                            gasto=="Vacunas Influenza"~"Farmacia",
-                                            gasto=="Remedios"~"Farmacia",
-                                            gasto=="Plata fiestas patrias basureros"~"donaciones/regalos",
-                                        T~gasto)) %>% 
+    dplyr::mutate(gasto2= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
+                  gasto=="aspiradora"~"Electrodomésticos/mantención casa",
+                  gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
+                  gasto=="Tina"~"Electrodomésticos/mantención casa",
+                  gasto=="Nexium"~"Farmacia",
+                  gasto=="donaciones"~"Donaciones/regalos",
+                  gasto=="Regalo chocolates"~"Donaciones/regalos",
+                  gasto=="filtro piscina msp"~"Electrodomésticos/mantención casa",
+                  gasto=="Chromecast"~"Electrodomésticos/mantención casa",
+                  gasto=="Muebles ratan"~"Electrodomésticos/mantención casa",
+                  gasto=="Vacuna Influenza"~"Farmacia",
+                  gasto=="Easy"~"Electrodomésticos/mantención casa",
+                  gasto=="Sopapo"~"Electrodomésticos/mantención casa",
+                  gasto=="filtro agua"~"Electrodomésticos/mantención casa",
+                  gasto=="ropa tami"~"Donaciones/regalos",
+                  gasto=="yaz"~"Farmacia",
+                  gasto=="Yaz"~"Farmacia",
+                  gasto=="Remedio"~"Farmacia",
+                  gasto=="Entel"~"VTR",
+                  gasto=="Kerosen"~"Gas/Bencina",
+                  gasto=="Parafina"~"Gas/Bencina",
+                  gasto=="Plata basurero"~"Donaciones/regalos",
+                  gasto=="Matri Andrés Kogan"~"Donaciones/regalos",
+                  gasto=="Wild Protein"~"Comida",
+                  gasto=="Granola Wild Foods"~"Comida",
+                  gasto=="uber"~"Transporte",
+                  gasto=="Uber Reñaca"~"Transporte",
+                  gasto=="filtro piscina mspa"~"Electrodomésticos/mantención casa",
+                  gasto=="Limpieza Alfombra"~"Electrodomésticos/mantención casa",
+                  gasto=="Aspiradora"~"Electrodomésticos/mantención casa",
+                  gasto=="Limpieza alfombras"~"Electrodomésticos/mantención casa",
+                  gasto=="Pila estufa"~"Electrodomésticos/mantención casa",
+                  gasto=="Reloj"~"Electrodomésticos/mantención casa",
+                  gasto=="Arreglo"~"Electrodomésticos/mantención casa",
+                  gasto=="Pan Pepperino"~"Comida",
+                  gasto=="Cookidoo"~"Comida",
+                  gasto=="remedios"~"Farmacia",
+                  gasto=="Bendina Reñaca"~"Gas/Bencina",
+                  gasto=="Bencina Reñaca"~"Gas/Bencina",
+                  gasto=="Vacunas Influenza"~"Farmacia",
+                  gasto=="Remedios"~"Farmacia",
+                  gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
+                  #2024
+                  gasto=="cartero"~"Correo",
+                  gasto=="correo"~"Correo",
+                  gasto=="Gaviscón y Paracetamol"~"Farmacia",
+                  gasto=="Regalo Matri Cony"~"Donaciones/regalos",
+                  gasto=="Regalo Matri Chepa"~"Donaciones/regalos",
+                  gasto=="Aporte Basureros"~"Donaciones/regalos",
+                  gasto=="donación"~"Donaciones/regalos",
+                  gasto=="Plata Reciclaje y Basurero"~"Donaciones/regalos",
+                  gasto=="basureros"~"Donaciones/regalos",
+                  gasto=="Microondas regalo"~"Donaciones/regalos",
+                  gasto=="Cruz Verde"~"Farmacia",
+                  gasto=="Remedios Covid"~"Farmacia",      
+                  gasto=="nacho"~"Electrodomésticos/mantención casa",
+                  gasto=="Jardinero"~"Electrodomésticos/mantención casa",
+                  gasto=="mantencion toyotomi"~"Electrodomésticos/mantención casa",
+                  gasto=="Cámaras Seguridad M.Barrios"~"Electrodomésticos/mantención casa",      
+                  gasto=="Uber cumple papá"~"Transporte",
+                  gasto=="Uber"~"Transporte",
+                  gasto=="Uber Matri Cony"~"Transporte",
+                  gasto=="Bencina + tag"~"Gas/Bencina",
+                  gasto=="Bencina + Tag cumple Delox"~"Gas/Bencina",
+                  gasto=="Bencina + peajes Maite"~"Gas/Bencina",
+                  gasto=="Crunchyroll"~"Netflix",
+                  gasto=="Crunchyroll"~"Netflix",
+                  gasto=="Incoludido"~"Enceres",
+                  gasto=="Cortina baño"~"Electrodomésticos/mantención casa",
+                  gasto=="Forro cortina ducha"~"Electrodomésticos/mantención casa",
+                  gasto=="Brussels"~"Comida",
+                  gasto=="Tres toques"~"Enceres",
+                  gasto=="Transferencia"~"Otros",
+                  gasto=="prestamo"~"Otros",
+                  gasto=="Préstamo Andrés"~"Otros",
+                  gasto=="mouse"~"Otros",
+                  gasto=="lamina"~"Otros",
+      T~gasto)) %>% 
   dplyr::mutate(fecha_month=factor(fecha_month, levels=format(seq(from = as.Date("2019-03-03"), to = as.Date(substr(Sys.time(),1,10)), by = "1 month"),"%Y-%m")))%>% 
   dplyr::mutate(gasto2=factor(gasto2, levels=c("Agua", "Comida", "Comunicaciones","Electricidad", "Enceres", "Farmacia", "Gas/Bencina", "Diosi", "donaciones/regalos", "Electrodomésticos/ Mantención casa", "VTR", "Netflix", "Otros")))%>% 
     dplyr::group_by(fecha_month, gasto2, .drop=F)%>%
