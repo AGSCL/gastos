@@ -869,6 +869,16 @@ fit_month_gasto <- Gastos_casa %>%
     dplyr::summarise(gasto_total=sum(monto, na.rm = T)/1000)%>%
   data.frame() %>% na.omit()
 
+fit_month_gasto_25<-
+fit_month_gasto %>% 
+    #dplyr::filter()
+    dplyr::filter(grepl("2025",fecha_month)) %>% 
+    #sacar el ultimo mes
+    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
+    dplyr::group_by(gasto2) %>% 
+    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
+  data.frame()%>% ungroup()
+
 fit_month_gasto_24<-
 fit_month_gasto %>% 
     #dplyr::filter()
@@ -912,14 +922,15 @@ fit_month_gasto %>%
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
   data.frame() %>% ungroup()
 
-fit_month_gasto_24 %>% 
+fit_month_gasto_25 %>% 
+dplyr::right_join(fit_month_gasto_24,by="gasto2") %>%
 dplyr::right_join(fit_month_gasto_23,by="gasto2") %>%
 dplyr::right_join(fit_month_gasto_22,by="gasto2") %>%
 dplyr::right_join(fit_month_gasto_21,by="gasto2") %>% 
 dplyr::right_join(fit_month_gasto_20,by="gasto2") %>% 
   janitor::adorn_totals() %>% 
   #dplyr::select(-3)%>% 
-  knitr::kable(format = "markdown", size=12, col.names= c("Item","2024","2023","2022","2021","2020"))
+  knitr::kable(format = "markdown", size=12, col.names= c("Item","2025","2024","2023","2022","2021","2020"))
 ```
 :::
  
@@ -992,17 +1003,18 @@ uf20 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2020.htm")%>% 
 uf21 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2021.htm")%>% rvest::html_nodes("table")
 uf22 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2022.htm")%>% rvest::html_nodes("table")
 uf23 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2023.htm")%>% rvest::html_nodes("table")
+uf24 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2024.htm")%>% rvest::html_nodes("table")
 
-tryCatch(uf24 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2024.htm")%>% rvest::html_nodes("table"),
+tryCatch(uf25 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2025.htm")%>% rvest::html_nodes("table"),
     error = function(c) {
       uf24b <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
       
     }
   )
 
-tryCatch(uf24 <-uf24[[length(uf24)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1),
+tryCatch(uf25 <-uf25[[length(uf25)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1),
     error = function(c) {
-      uf24 <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
+      uf25 <<- cbind.data.frame(Día=NA, variable=NA, value=NA)
     }
 )
 
@@ -1019,7 +1031,9 @@ cbind.data.frame(anio= 2021, uf21[[length(uf21)]] %>% rvest::html_table() %>% da
 cbind.data.frame(anio= 2022, uf22[[length(uf22)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
 
 cbind.data.frame(anio= 2023, uf23[[length(uf23)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
-cbind.data.frame(anio= 2024, uf24)
+
+cbind.data.frame(anio= 2024, uf23[[length(uf24)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
+cbind.data.frame(anio= 2025, uf25)
 )
 
 uf_serie_corrected<-
