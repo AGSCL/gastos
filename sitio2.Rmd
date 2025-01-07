@@ -917,7 +917,7 @@ fit_month_gasto %>%
 fit_month_gasto_20<-
 fit_month_gasto %>% 
     #dplyr::filter()
-    dplyr::filter(grepl("202",fecha_month)) %>% 
+    dplyr::filter(grepl("2020",fecha_month)) %>% 
     dplyr::group_by(gasto2) %>% 
     dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
   data.frame() %>% ungroup()
