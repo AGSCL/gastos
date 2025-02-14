@@ -31,6 +31,11 @@ jobs:
         run: |
           echo "SUPERSECRET=$SUPERSECRET" >> ~/.Renviron
           echo "API_NIXTLA=$API_NIXTLA" >> ~/.Renviron
+      - name: Set TimeGPT API Key
+        run: echo "API_NIXTLA=${{ secrets.API_NIXTLA }}" >> $GITHUB_ENV
+      
+      - name: Test API Key
+        run: Rscript -e "print(Sys.getenv('API_NIXTLA'))"
 
       - name: Set locale
         shell: bash
