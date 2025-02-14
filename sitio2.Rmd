@@ -1067,7 +1067,6 @@ fr_fit_tbats<-forecast::forecast(fit_tbats, h=298)
 ```{r 1-NIXTLA, echo=T, paged.print=TRUE,eval=T}
 # Configurar API Key
 nixtlar::nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
-nixtla_client_setup(api_key = Sys.getenv("API_NIXTLA"))
 
 # Preparar datos en formato requerido por TimeGPT
 uf_timegpt <- uf_serie_corrected %>%
