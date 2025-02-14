@@ -33,6 +33,8 @@ jobs:
           echo "API_NIXTLA=$API_NIXTLA" >> ~/.Renviron
 
       - name: Set locale
+        shell: bash
+        if: always()
         run: |
           Rscript -e 'Sys.setlocale("LC_TIME", "Spanish_Chile.1252")'
           Rscript -e 'Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")'
@@ -45,6 +47,7 @@ jobs:
           restore-keys: ${{ runner.os }}-r-
       
       - name: Install dependencies
+        if: always()
         run: |
           Rscript -e 'install.packages(c(
             "tidyverse", "rmarkdown", "knitr", "lubridate", "forecast",
@@ -53,6 +56,7 @@ jobs:
           ), repos = "https://cloud.r-project.org")'
 
       - name: Render RMarkdown
+        if: always()
         run: Rscript -e 'rmarkdown::render("sitio2.Rmd")'
         
       - name: Commit and Push
