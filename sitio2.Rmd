@@ -1085,7 +1085,7 @@ timegpt_fcst <- nixtlar::nixtla_client_fcst(
 nixtlar::nixtla_client_plot(timegpt_fcst)
 ```
 
-```{r 1-5, echo=T, paged.print=TRUE,eval=T}
+```{r 1-5-nixtla, echo=T, paged.print=TRUE,eval=T}
 # Extraer pronósticos de TimeGPT
 timegpt_proy <- timegpt_fcst$data %>%
   filter(type == "forecast") %>%
