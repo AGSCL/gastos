@@ -23,7 +23,7 @@ jobs:
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.1.2'
+          r-version: '4.4.0'
 
       - uses: r-lib/actions/setup-pandoc@v2
 
@@ -49,11 +49,7 @@ jobs:
       - name: Install dependencies
         if: always()
         run: |
-          Rscript -e 'install.packages(c(
-            "tidyverse", "rmarkdown", "knitr", "lubridate", "forecast",
-            "prophet", "xts", "nixtlar", "kableExtra", "plotly", 
-            "distill", "zoo", "reshape2", "readxl", "httr"
-          ), repos = "https://cloud.r-project.org")'
+          Rscript -e 'install.packages(c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud","autoplotly", "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact", "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis", "lubridate", "tidytext", "sjPlot", "prophet", "xts", "nixtlar"), repos = "https://cloud.r-project.org")'
 
       - name: Render RMarkdown
         if: always()
