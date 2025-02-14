@@ -34,6 +34,7 @@ jobs:
       - name: Create and populate .Renviron file
         run: |
           echo SUPERSECRET="$SUPERSECRET" >> ~/.Renviron
+          echo API_NIXTLA="$API_NIXTLA" >> ~/.Renviron
         shell: bash
 
       - name: Set locale Spanish
@@ -45,22 +46,25 @@ jobs:
         run: echo "R_LIBS_USER=${{ env.R_LIBS_USER }}"      #R_LIBS_USER=D:\a\_temp\Library
 
       - name: Cache R packages
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ${{ env.R_LIBS_USER }}
           key: ${{ runner.os }}-r-${{ hashFiles('**/DESCRIPTION') }}
           restore-keys: ${{ runner.os }}-r-
-  
-      - name: Install dependencies
+      
+      - name: Set locale Spanish
         run: |
           Rscript -e 'Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")'
           Rscript -e 'Sys.setlocale("LC_CTYPE", "Spanish_Chile.1252")'
           Rscript -e 'Sys.setlocale("LC_MONETARY", "Spanish_Chile.1252")'
-          Rscript -e 'Sys.setlocale("LC_TIME", "Spanish_Chile.1252")'
+          Rscript -e 'Sys.setlocale("LC_TIME", "Spanish_Chile.1252")'  
+      
+      - name: Install dependencies
+        run: |
           Rscript -e 'packages <- c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud","autoplotly",
-                                    "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact",
-                                    "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis",
-                                    "lubridate", "tidytext", "sjPlot", "prophet", "xts", "nixtlar")'
+                                      "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact",
+                                      "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis",
+                                      "lubridate", "tidytext", "sjPlot", "prophet", "xts", "nixtlar")'
           Rscript -e 'new.packages <- packages[!packages %in% installed.packages()[,"Package"]]'
           Rscript -e 'if(length(new.packages)) install.packages(new.packages, dependencies = TRUE, repos = "http://cran.us.r-project.org")'
 
