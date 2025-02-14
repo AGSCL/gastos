@@ -53,23 +53,21 @@ jobs:
   
       - name: Install dependencies
         run: |
-          Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")
-          Sys.setlocale("LC_CTYPE", "Spanish_Chile.1252")
-          Sys.setlocale("LC_MONETARY", "Spanish_Chile.1252")
-          Sys.setlocale("LC_TIME", "Spanish_Chile.1252")
-          packages <- c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud","autoplotly",
-                        "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact",
-                        "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis",
-                        "lubridate", "tidytext", "sjPlot")
-          new.packages <- packages[!packages %in% installed.packages()[,"Package"]]
-          if(length(new.packages)) install.packages(new.packages, dependencies = TRUE)
-        shell: Rscript {0}
+          Rscript -e 'Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")'
+          Rscript -e 'Sys.setlocale("LC_CTYPE", "Spanish_Chile.1252")'
+          Rscript -e 'Sys.setlocale("LC_MONETARY", "Spanish_Chile.1252")'
+          Rscript -e 'Sys.setlocale("LC_TIME", "Spanish_Chile.1252")'
+          Rscript -e 'packages <- c("lintr", "rsconnect", "devtools", "kableExtra","sjPlot","tsibble","zoo","reshape2","ggiraph","gplots","wordcloud","autoplotly",
+                                    "tidyverse", "distill", "plotly", "knitr", "survminer","readr","rowr","DataExplorer","SnowballC","readr","scales","CausalImpact",
+                                    "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis",
+                                    "lubridate", "tidytext", "sjPlot", "prophet", "xts", "nixtlar")'
+          Rscript -e 'new.packages <- packages[!packages %in% installed.packages()[,"Package"]]'
+          Rscript -e 'if(length(new.packages)) install.packages(new.packages, dependencies = TRUE, repos = "http://cran.us.r-project.org")'
 
       - name: Run script
         if: always()
         run: |
-          rmarkdown::render("sitio2.Rmd")
-        shell: Rscript {0}
+          Rscript -e 'rmarkdown::render("sitio2.Rmd")'
         
       - name: Commit files
         run: |
