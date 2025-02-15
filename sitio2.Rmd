@@ -1064,7 +1064,7 @@ fr_fit_tbats<-forecast::forecast(fit_tbats, h=298)
 
 ```
 
-```{r 1-NIXTLA, echo=T, paged.print=TRUE,eval=T}
+```{r 1-NIXTLA, echo=T, paged.print=TRUE,eval=T, error=T}
 # Configurar API Key
 nixtlar::nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
 
@@ -1086,7 +1086,7 @@ level = c(80,95)
 nixtlar::nixtla_client_plot(timegpt_fcst)
 ```
 
-```{r 1-5-nixtla, echo=T, paged.print=TRUE,eval=T}
+```{r 1-5-nixtla, echo=T, paged.print=TRUE,eval=T, error=T}
 # Extraer pronósticos de TimeGPT
 timegpt_proy <- timegpt_fcst$data %>%
   filter(type == "forecast") %>%
