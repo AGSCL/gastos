@@ -1124,7 +1124,7 @@ Ahora con un modelo ARIMA automático
 
 <br>
 
-```{r 1-5, echo=T, paged.print=TRUE,eval=T}
+```{r 1-5, echo=T, paged.print=TRUE,eval=T, error=T}
 #arima_optimal_uf = forecast::auto.arima(ts_uf_proy)
 #
 #  autoplotly::autoplotly(forecast::forecast(arima_optimal_uf, h=298), ts.colour = "darkred",
