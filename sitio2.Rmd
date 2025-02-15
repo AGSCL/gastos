@@ -1231,7 +1231,7 @@ ggplot() +
 ```
 
 ::: controlly                                                      
-```{r 1-5-2, echo=T, paged.print=TRUE,eval=T}
+```{r 1-5-2, echo=T, paged.print=TRUE,eval=T, error=T}
 dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats)),variable) %>% dplyr::summarise(max=max(value)) %>% 
 dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_uf)),variable) %>% dplyr::summarise(max=max(value)),by="variable") %>% 
   dplyr::mutate(variable=factor(variable,levels=c("Lo.95","Lo.80","Point.Forecast","Hi.80","Hi.95"))) %>% 
