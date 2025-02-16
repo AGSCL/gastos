@@ -1,5 +1,4 @@
 name: Actualiza_gastos
-
 on:
   push:
   schedule:
