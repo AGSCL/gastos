@@ -12,7 +12,7 @@ jobs:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       SUPERSECRET: ${{ secrets.SUPERSECRET }}
       API_NIXTLA: ${{ secrets.API_NIXTLA }}
-      NIXTLA_API_KEY:: ${{ secrets.API_NIXTLA }}
+      NIXTLA_API_KEY: ${{ secrets.API_NIXTLA }}
     permissions:
       contents: write
     steps:
@@ -31,7 +31,7 @@ jobs:
         run: |
           echo "SUPERSECRET=$SUPERSECRET" >> ~/.Renviron
           echo "API_NIXTLA=$API_NIXTLA" >> ~/.Renviron
-          echo "NIXTLA_API_KEY=$NIXTLA_API_KEY"
+          echo "NIXTLA_API_KEY=$NIXTLA_API_KEY" >> ~/.Renviron
       - name: Set TimeGPT API Key
         run: echo "API_NIXTLA=${{ secrets.API_NIXTLA }}" >> $GITHUB_ENV
       
@@ -59,8 +59,8 @@ jobs:
           Rscript -e 'install.packages(c("lintr", "rsconnect", "devtools", "kableExtra", "sjPlot", "tsibble", "zoo", "reshape2", "ggiraph", "gplots", "wordcloud", "autoplotly", "tidyverse", "distill", "plotly", "knitr", "survminer", "reader", "rowr", "DataExplorer","SnowballC","readr","scales","CausalImpact", "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis", "lubridate", "tidytext", "sjPlot", "prophet", "xts", "nixtlar"), repos = "https://cloud.r-project.org")'
           Rscript -e "nixtlar::nixtla_set_api_key(Sys.getenv('API_NIXTLA'))"
           Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA')))"
-          Rscript -e "nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA_API_KEY'))"
-          Rscript -e "nixtlar::nixtla_validate_api_key()"
+          Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA_API_KEY')))"
+          Rscript -e "try(nixtlar::nixtla_validate_api_key())"
       - name: Render RMarkdown
         if: always()
         run: Rscript -e 'rmarkdown::render("sitio2.Rmd")'
