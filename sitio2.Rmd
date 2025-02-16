@@ -1073,7 +1073,7 @@ uf_timegpt <- uf_serie_corrected %>%
     dplyr::rename(ds = date3, y = value) %>%
     dplyr::mutate(ds = format(ds, "%Y-%m-%d")) %>%
     dplyr::mutate(unique_id = "serie_1")%>%
-    dplyr::select(uf_timegpt, unique_id, ds, y)
+    dplyr::select(unique_id, ds, y)
 
 # Realizar pronóstico con TimeGPT
 timegpt_fcst <- nixtlar::nixtla_client_forecast(
