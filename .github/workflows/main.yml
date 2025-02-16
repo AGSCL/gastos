@@ -35,7 +35,8 @@ jobs:
         run: echo "API_NIXTLA=${{ secrets.API_NIXTLA }}" >> $GITHUB_ENV
       
       - name: Test API Key
-        run: Rscript -e "print(Sys.getenv('API_NIXTLA'))"
+        run: |
+          Rscript -e "print(Sys.getenv('API_NIXTLA'))"    
 
       - name: Set locale
         shell: bash
@@ -55,7 +56,9 @@ jobs:
         if: always()
         run: |
           Rscript -e 'install.packages(c("lintr", "rsconnect", "devtools", "kableExtra", "sjPlot", "tsibble", "zoo", "reshape2", "ggiraph", "gplots", "wordcloud", "autoplotly", "tidyverse", "distill", "plotly", "knitr", "survminer", "reader", "rowr", "DataExplorer","SnowballC","readr","scales","CausalImpact", "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis", "lubridate", "tidytext", "sjPlot", "prophet", "xts", "nixtlar"), repos = "https://cloud.r-project.org")'
-
+          Rscript -e "nixtlar::nixtla_set_api_key(Sys.getenv('API_NIXTLA'))"
+          Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA')))"
+          Rscript -e "nixtlar::nixtla_validate_api_key()"
       - name: Render RMarkdown
         if: always()
         run: Rscript -e 'rmarkdown::render("sitio2.Rmd")'
