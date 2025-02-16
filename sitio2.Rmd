@@ -1070,8 +1070,10 @@ nixtlar::nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
 
 # Preparar datos en formato requerido por TimeGPT
 uf_timegpt <- uf_serie_corrected %>%
-  select(ds = date3, y = value) %>%
-  mutate(ds = format(ds, "%Y-%m-%d"))
+    dplyr::rename(ds = date3, y = value) %>%
+    dplyr::mutate(ds = format(ds, "%Y-%m-%d")) %>%
+    dplyr::mutate(unique_id = "serie_1")%>%
+    dplyr::select(uf_timegpt, unique_id, ds, y)
 
 # Realizar pronóstico con TimeGPT
 timegpt_fcst <- nixtlar::nixtla_client_forecast(
@@ -1079,44 +1081,72 @@ timegpt_fcst <- nixtlar::nixtla_client_forecast(
   h = 298,               # 298 días a pronosticar
   freq = "D",            # Frecuencia diaria
   add_history = TRUE,     # Incluir datos históricos en el output
-level = c(80,95)
+  level = c(80,95),
+  model=  "timegpt-1-long-horizon", 
+  clean_ex_first = TRUE
+)
+
+# 1. Convertir 'ds' a fecha en ambas tablas
+uf_timegpt <- uf_timegpt %>% 
+    mutate(ds = as.Date(ds))
+
+timegpt_fcst <- timegpt_fcst %>% 
+    mutate(ds = as.Date(ds))
+
+# 2. Combinar los datos históricos y el pronóstico
+full_data <- bind_rows(
+    uf_timegpt %>% mutate(type = "Histórico"),
+    timegpt_fcst %>% mutate(type = "Pronóstico")
 )
 
 # Visualizar resultados
-nixtlar::nixtla_client_plot(timegpt_fcst)
+ggplot(full_data, aes(x = ds, y = TimeGPT)) +
+    # Intervalo de confianza del 95%
+    geom_ribbon(aes(ymin = `TimeGPT-lo-95`, ymax = `TimeGPT-hi-95`), 
+                fill = "#4B9CD3", alpha = 0.2) +
+    # Intervalo de confianza del 80%
+    geom_ribbon(aes(ymin = `TimeGPT-lo-80`, ymax = `TimeGPT-hi-80`), 
+                fill = "#4B9CD3", alpha = 0.3) +
+    # Línea histórica
+    geom_line(data = filter(full_data, type == "Histórico"), 
+              aes(color = "Histórico"), size = 1) +
+    # Línea de pronóstico
+    geom_line(data = filter(full_data, type == "Pronóstico"), 
+              aes(color = "Pronóstico"), size = 1) +
+    # Línea vertical separadora
+    geom_vline(xintercept = max(filter(full_data, type == "Histórico")$ds), 
+               linetype = "dashed", color = "red", size = 0.8) +
+    # Configuración del eje x
+    scale_x_date(
+        date_breaks = "3 months",  # Reduce la frecuencia de las etiquetas
+        date_labels = "%b %Y",  # Formato de etiquetas (mes y año)
+    ) +
+    # Configuración del eje y
+    scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) +
+    # Configuración de colores
+    scale_color_manual(
+        name = "Leyenda",
+        values = c("Histórico" = "black", "Pronóstico" = "#4B9CD3")
+    ) +
+    # Títulos y subtítulos
+    labs(
+        title = "Pronóstico de Serie Temporal con TimeGPT",
+        subtitle = "Intervalos de confianza al 80% (más oscuro) y 95% (más claro)",
+        x = "Fecha",
+        y = "Valor",
+        color = "Leyenda"
+    ) +
+    # Tema y estilos
+    theme_minimal() +
+    theme(
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.position = "bottom",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+    )
 ```
-
-```{r 1-5-nixtla, echo=T, paged.print=TRUE,eval=T, error=T}
-# Extraer pronósticos de TimeGPT
-timegpt_proy <- timegpt_fcst$data %>%
-  filter(type == "forecast") %>%
-  select(ds, timegpt_fcst = y)
-
-# Combinar con otras proyecciones
-comparativo <- bind_rows(
-  data.frame(
-    ds = uf_serie_corrected$date3,
-    Real = uf_serie_corrected$value
-  ),
-  data.frame(
-    ds = as.Date(names(fr_fit_tbats$mean)),
-    TBATS = as.numeric(fr_fit_tbats$mean),
-    ARIMA = as.numeric(fr_fit_tbats_uf$mean)
-  ) %>%
-    left_join(timegpt_proy, by = "ds")
-)
-
-# Crear tabla comparativa
-comparativo %>%
-  tail(10) %>%
-  knitr::kable(
-    format = "markdown",
-    col.names = c("Fecha", "Real", "TBATS", "ARIMA", "TimeGPT"),
-    digits = 0,
-    caption = "Comparación de pronósticos para la UF"
-  )
-```
-
 
 `r paste0("La proyección de la UF a 298 días más ",tail(uf_serie_corrected$date2,1)+298," sería de: ",format(round(as.numeric(tail(forecast::forecast(fit_tbats, h=298)$mean,1)),0),big.mark=".", decimal.mark = ","), " pesos// Percentil 95% más alto proyectado: ",suppressWarnings(format(tail(round(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats, h=350)),"\\s{1,}"))),2),1),big.mark=".", decimal.mark = ",")))`
 
@@ -1125,109 +1155,24 @@ Ahora con un modelo ARIMA automático
 <br>
 
 ```{r 1-5, echo=T, paged.print=TRUE,eval=T, error=T}
-#arima_optimal_uf = forecast::auto.arima(ts_uf_proy)
-#
-#  autoplotly::autoplotly(forecast::forecast(arima_optimal_uf, h=298), ts.colour = "darkred",
-#           predict.colour = "blue", predict.linetype = "dashed")%>% 
-#  plotly::layout(showlegend = F, 
-#          yaxis = list(title = "Gastos"),
-#         xaxis = list(
-#    title="Fecha",
-#      ticktext = as.list(seq(from = as.Date("2018-01-01"), 
-#                                  to = as.Date("2018-01-01")+length(fit_tbats$fitted.values)+298, by = 90)), 
-#      tickvals = as.list(seq(from = as.numeric(as.Date("2018-01-01")), 
-#                             to = as.numeric(as.Date("2018-01-01"))+length(fit_tbats$fitted.values)+298, by = 90)),
-#      tickmode = "array",
-#    tickangle = 90
-#    ))
-#
-#fr_fit_tbats_uf<-forecast::forecast(arima_optimal_uf, h=298)
-library(ggplot2)
-library(dplyr)
-library(tidyr)
+arima_optimal_uf = forecast::auto.arima(ts_uf_proy)
 
-# 1. Preparar datos históricos y pronósticos
-history <- uf_serie_corrected %>% 
-  select(ds = date3, Real = value)
+  autoplotly::autoplotly(forecast::forecast(arima_optimal_uf, h=298), ts.colour = "darkred",
+           predict.colour = "blue", predict.linetype = "dashed")%>% 
+  plotly::layout(showlegend = F, 
+          yaxis = list(title = "Gastos"),
+         xaxis = list(
+    title="Fecha",
+      ticktext = as.list(seq(from = as.Date("2018-01-01"), 
+                                  to = as.Date("2018-01-01")+length(fit_tbats$fitted.values)+298, by = 90)), 
+      tickvals = as.list(seq(from = as.numeric(as.Date("2018-01-01")), 
+                             to = as.numeric(as.Date("2018-01-01"))+length(fit_tbats$fitted.values)+298, by = 90)),
+      tickmode = "array",
+    tickangle = 90
+    ))
 
-# 2. Extraer pronósticos de todos los modelos
-forecasts <- bind_rows(
-  # TimeGPT
-  timegpt_fcst$data %>% 
-    filter(type == "forecast") %>% 
-    select(ds, TimeGPT = y) %>% 
-    mutate(ds = as.Date(ds)),
-  
-  # TBATS
-  data.frame(
-    ds = as.Date(as.numeric(time(ts_uf_proy)) + 298),
-    TBATS = as.numeric(fr_fit_tbats$mean)
-  ),
-  
-  # ARIMA
-  data.frame(
-    ds = as.Date(as.numeric(time(ts_uf_proy)) + 298),
-    ARIMA = as.numeric(fr_fit_tbats_uf$mean)
-  )
-) %>% 
-  pivot_longer(-ds, names_to = "Modelo", values_to = "Proyección")
+fr_fit_tbats_uf<-forecast::forecast(arima_optimal_uf, h=298)
 
-# 3. Crear el gráfico
-ggplot() +
-  # Datos históricos
-  geom_line(data = history, aes(x = ds, y = Real, color = "Real"), linewidth = 0.8) +
-  
-  # Pronósticos
-  geom_line(data = forecasts, aes(x = ds, y = Proyección, color = Modelo), 
-            linewidth = 0.8, linetype = "dashed") +
-  
-  # Intervalos de confianza de TimeGPT
-  geom_ribbon(
-    data = timegpt_fcst$data %>% 
-      filter(type == "forecast") %>% 
-      mutate(ds = as.Date(ds)),
-    aes(x = ds, ymin = lo_95, ymax = hi_95),
-    fill = "#4daf4a", alpha = 0.2
-  ) +
-  
-  # Estilo y formato
-  scale_color_manual(
-    values = c(
-      "Real" = "#377eb8",
-      "TimeGPT" = "#4daf4a",
-      "TBATS" = "#e41a1c",
-      "ARIMA" = "#984ea3"
-    )
-  ) +
-  labs(
-    title = "Comparación de Proyecciones de UF",
-    subtitle = "Modelos: TimeGPT vs TBATS vs ARIMA",
-    x = "Fecha",
-    y = "Valor UF",
-    color = "Leyenda"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "bottom",
-    plot.title = element_text(face = "bold", size = 14),
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  ) +
-  scale_x_date(date_breaks = "3 months", date_labels = "%b %Y") +
-  geom_vline(
-    xintercept = max(history$ds),
-    linetype = "dashed",
-    color = "gray50",
-    linewidth = 0.6
-  ) +
-  annotate(
-    "text",
-    x = max(history$ds) - 30,
-    y = max(history$Real) * 0.95,
-    label = "Inicio pronósticos",
-    angle = 90,
-    color = "gray50",
-    size = 3
-  )
 ```
 
 ::: controlly                                                      
