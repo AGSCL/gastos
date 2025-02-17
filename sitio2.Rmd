@@ -1207,13 +1207,22 @@ ggplot(forecast, aes(x = ds, y = yhat)) +
 `r paste0("La proyección de la UF a 298 días más ",tail(uf_serie_corrected$date2,1)+298," sería de: ",format(round(as.numeric(tail(forecast::forecast(fit_tbats, h=298)$mean,1)),0),big.mark=".", decimal.mark = ","), " pesos// Percentil 95% más alto proyectado: ",suppressWarnings(format(tail(round(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats, h=350)),"\\s{1,}"))),2),1),big.mark=".", decimal.mark = ",")))`
 
 Según TimeGPT:
-`r paste0("La proyección de la UF a 298 días más ",
-              as.Date(max(unclass(timegpt_fcst$ds), na.rm=T), "1970-01-01")," sería de: ",
-              format(tail(timegpt_fcst,1)$TimeGPT,big.mark=".", decimal.mark = ","), 
-       " pesos// Percentil 80% más alto proyectado: ",
-       format(tail(timegpt_fcst,1)$`TimeGPT-hi-80`,big.mark=".", decimal.mark = ","), 
-              " pesos// Percentil 95% más alto proyectado: ",
-              format(tail(timegpt_fcst,1)$`TimeGPT-hi-95`,big.mark=".", decimal.mark = ","))`
+`r try({
+    if (exists("timegpt_fcst") && nrow(timegpt_fcst) > 0) {
+        paste0(
+            "La proyección de la UF a 298 días más ",
+            as.Date(max(unclass(timegpt_fcst$ds), na.rm = TRUE), "1970-01-01"), 
+            " sería de: ",
+            format(tail(timegpt_fcst, 1)$TimeGPT, big.mark = ".", decimal.mark = ","), 
+            " pesos// Percentil 80% más alto proyectado: ",
+            format(tail(timegpt_fcst, 1)[["TimeGPT-hi-80"]], big.mark = ".", decimal.mark = ","), 
+            " pesos// Percentil 95% más alto proyectado: ",
+            format(tail(timegpt_fcst, 1)[["TimeGPT-hi-95"]], big.mark = ".", decimal.mark = ",")
+        )
+    } else {
+        "Proyección no disponible temporalmente"
+    }
+}, silent = TRUE)`
 
 Según prophet:
 `r paste0("La proyección de la UF a 298 días más ",
