@@ -1064,7 +1064,7 @@ fr_fit_tbats<-forecast::forecast(fit_tbats, h=298)
 
 ```
 
-```{r 1-NIXTLA, echo=T, paged.print=TRUE,eval=T, error=T}
+```{r 1-NIXTLA, echo=T, paged.print=TRUE,eval=T, error=T, fig.align='center', fig.pos='H', caption="Figura. Proyección de UF , Modelo TimeGPT"}
 # Configurar API Key
 nixtlar::nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
 try(nixtlar::nixtla_set_api_key(Sys.getenv("NIXTLA")))
@@ -1150,7 +1150,7 @@ ggplot(full_data, aes(x = ds, y = TimeGPT)) +
 ```
 
 
-```{r 1-prophet, echo=T, paged.print=TRUE,eval=T, error=T}
+```{r 1-prophet, echo=T, paged.print=TRUE,eval=T, error=T, fig.align='center', fig.pos='H', caption="Figura. Proyección de UF , Modelo Prohet"}
 library(prophet)
   model <- prophet(
   cbind.data.frame(ds= as.Date(uf_timegpt$ds), y=uf_timegpt$y),
@@ -1202,7 +1202,18 @@ ggplot(forecast, aes(x = ds, y = yhat)) +
     plot.caption = element_text(color = "gray30")
   )
 ```
+
+
 `r paste0("La proyección de la UF a 298 días más ",tail(uf_serie_corrected$date2,1)+298," sería de: ",format(round(as.numeric(tail(forecast::forecast(fit_tbats, h=298)$mean,1)),0),big.mark=".", decimal.mark = ","), " pesos// Percentil 95% más alto proyectado: ",suppressWarnings(format(tail(round(as.numeric(unlist(strsplit(capture.output(forecast::forecast(fit_tbats, h=350)),"\\s{1,}"))),2),1),big.mark=".", decimal.mark = ",")))`
+
+Según TimeGPT:
+`r paste0("La proyección de la UF a 298 días más ",
+              as.Date(max(unclass(timegpt_fcst$ds), na.rm=T), "1970-01-01")," sería de: ",
+              format(tail(timegpt_fcst,1)$TimeGPT,big.mark=".", decimal.mark = ","), 
+       " pesos// Percentil 80% más alto proyectado: ",
+       format(tail(timegpt_fcst,1)$`TimeGPT-hi-80`,big.mark=".", decimal.mark = ","), 
+              " pesos// Percentil 95% más alto proyectado: ",
+              format(tail(timegpt_fcst,1)$`TimeGPT-hi-95`,big.mark=".", decimal.mark = ","))`
 
 Según prophet:
 `r paste0("La proyección de la UF a 298 días más ",
@@ -1254,7 +1265,7 @@ dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_uf)),va
 Lo haré en base a 2 cálculos: el gasto semanal y el gasto mensual en base a mis gastos desde marzo de 2019. La primera proyección la hice añadiendo el precio del arriendo mensual y partiendo en 2 (porque es con yo y Tami). No se incluye el último mes.
 
 
-```{r 2, echo=T, paged.print=TRUE,eval=T , echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE,caption="Figura. Proyección de gastos (incluyendo arriendo), Modelo TBATS"}
+```{r 2, echo=T, paged.print=TRUE,eval=T , echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE, caption="Figura. Proyección de gastos (incluyendo arriendo), Modelo TBATS"}
 Gastos_casa_nvo <- readr::read_csv(as.character(path_sec),
                                col_names = c("Tiempo", "gasto", "fecha", "obs", "monto", "gastador",
                                              "link"),skip=1) %>% 
