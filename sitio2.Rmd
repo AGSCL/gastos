@@ -1419,6 +1419,118 @@ Gastos_casa_mensual_2022 %>%
 ) %>% ggplotly()
 ```
 
+```{r predictor-gastador-gastos-manual-timegpt, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual, predicho"}
+Gastos_casa_mensual_2022$mes_ano <- gsub("marzo", "Mar", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("abril", "Apr", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("mayo", "May", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("junio", "Jun", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("julio", "Jul", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("agosto", "Aug", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("septiembre", "Sep", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("octubre", "Oct", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("noviembre", "Nov", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("diciembre", "Dec", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("enero", "Jan", Gastos_casa_mensual_2022$mes_ano)
+Gastos_casa_mensual_2022$mes_ano <- gsub("febrero", "Feb", Gastos_casa_mensual_2022$mes_ano)
+
+Gastos_casa_mensual_2022<- dplyr::filter(Gastos_casa_mensual_2022, !is.na(Tami))
+
+Gastos_casa_mensual_2022$mes_ano <- parse_date_time(Gastos_casa_mensual_2022$mes_ano, "%b_%Y")
+
+Gastos_casa_mensual_2022$mes_ano <- as.Date(as.character(Gastos_casa_mensual_2022$mes_ano))
+
+Gastos_casa_mensual_2022_timegpt <- Gastos_casa_mensual_2022 %>%
+  mutate(value = Tami + Andrés) %>%
+  rename(ds = mes_ano, y = value) %>%
+  mutate(#ds= format(ds, "%Y-%m"),
+         unique_id = "1") %>% #it is only one series
+  select(unique_id, ds, y)
+
+#Convertir la base de UF a mensual
+uf_timegpt_my <- uf_serie_corrected %>%
+  dplyr::rename(ds = date3, y = value) %>%
+  dplyr::mutate(ds = format(ds, "%Y-%m-%d")) %>%
+  dplyr::mutate(unique_id = "serie_1")%>%
+  dplyr::select(unique_id, ds, y) %>%
+  mutate(ds = ymd(ds)) %>%  # Convert 'ds' to Date
+  mutate(month = month(ds), year = year(ds)) %>%  # Extract month and year
+  group_by(month, year) %>%  # Group by month and year
+  summarise(average_y = mean(y))%>%  # Calculate average y
+  mutate(ds = as.Date(paste0(year,"-",month, "-01")))%>%
+  ungroup()%>%
+  select(ds, uf=average_y)
+
+Gastos_casa_mensual_2022_timegpt_ex<-
+Gastos_casa_mensual_2022_timegpt |> 
+  dplyr::left_join(uf_timegpt_my, by=c("ds"="ds")) 
+
+#Historical Exogenous Variables: These should be included in the input data immediately following the id_col, ds, and y columns
+gastos_timegpt_fcst <- nixtla_client_forecast(
+  Gastos_casa_mensual_2022_timegpt_ex,
+  h = 12,
+  freq = "M",  # Monthly frequency
+  add_history = TRUE,
+  level = c(80, 95),
+  model = "timegpt-1",#"timegpt-1-long-horizon",
+  clean_ex_first = TRUE
+)
+
+# Convert 'ds' to Date format in both tables
+Gastos_casa_mensual_2022_timegpt_corr <- Gastos_casa_mensual_2022_timegpt %>%
+  mutate(ds = as.Date(paste0(ds, "-01")))  # Add day to make it a complete date
+
+gastos_timegpt_fcst <- gastos_timegpt_fcst %>%
+  mutate(ds = as.Date(paste0(ds, "-01")))  # Add day to make it a complete date
+
+# Combine historical and forecast data
+full_data_gastos <- bind_rows(
+  Gastos_casa_mensual_2022_timegpt_corr %>% mutate(type = "Histórico"),
+  gastos_timegpt_fcst %>% mutate(type = "Pronóstico")
+)
+
+full_data_gastos |> 
+  dplyr::mutate(y= ifelse(is.na(y),TimeGPT, y)) |> 
+# Visualize results
+ggplot(aes(x = ds, y = y)) +
+  geom_ribbon(aes(ymin = `TimeGPT-lo-95`, ymax = `TimeGPT-hi-95`),
+              fill = "#4B9CD3", alpha = 0.2) +
+  geom_ribbon(aes(ymin = `TimeGPT-lo-80`, ymax = `TimeGPT-hi-80`),
+              fill = "#4B9CD3", alpha = 0.3) +
+  geom_line(aes(color = type), linewidth = 1.5) +
+  geom_vline(xintercept = max(filter(full_data_gastos, type == "Histórico")$ds),
+             linetype = "dashed", color = "red", linewidth = 0.8) +
+  scale_x_date(
+    date_breaks = "3 months",
+    date_labels = "%b %Y"
+  ) +
+  scale_y_continuous(
+    name = "Gastos Totales",
+    labels = scales::comma,
+    breaks = pretty(full_data_gastos$y, n = 10),
+    expand = expansion(mult = c(0.05, 0.05))
+  ) +
+  scale_color_manual(
+    name = "Leyenda",
+    values = c("Histórico" = "black", "Pronóstico" = "#4B9CD3")
+  ) +
+  labs(
+    title = "Pronóstico de Gastos Mensuales (TimeGPT, ajustando por UF promedio mensual)",
+    subtitle = "Intervalos de confianza al 80% (más oscuro) y 95% (más claro)",
+    x = "Fecha",
+    y = "Gastos Totales",
+    color = "Leyenda"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    legend.position = "bottom",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
 <br>
 
 # Session Info
