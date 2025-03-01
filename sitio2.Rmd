@@ -1465,7 +1465,7 @@ Gastos_casa_mensual_2022_timegpt |>
   dplyr::left_join(uf_timegpt_my, by=c("ds"="ds")) 
 
 #Historical Exogenous Variables: These should be included in the input data immediately following the id_col, ds, and y columns
-gastos_timegpt_fcst <- nixtla_client_forecast(
+gastos_timegpt_fcst <- nixtlar::nixtla_client_forecast(
   Gastos_casa_mensual_2022_timegpt_ex,
   h = 12,
   freq = "M",  # Monthly frequency
