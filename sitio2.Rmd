@@ -708,8 +708,7 @@ ggplot(mstl_long, aes(x = Date, y = Value)) +
 
 
 ```{r bsts, eval=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Proyección de Gasto Semanal Pre-Post COVID, Interrupción de Tiempo"}
-library(bsts)
-library(CausalImpact)
+
 ts_week_covid<-  
 Gastos_casa %>%
     dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
@@ -727,35 +726,6 @@ ts_week_covid$gasto_total_na<-ts_week_covid$gasto_total
 post_resp<-ts_week_covid$gasto_total[which(ts_week_covid$covid==1)]
 ts_week_covid$gasto_total_na[which(ts_week_covid$covid==1)]<-NA
 ts_week_covid$gasto_total[which(ts_week_covid$covid==0)]
-
-# Model 1
-ssd <- list()
-# Local trend, weekly-seasonal #https://qastack.mx/stats/209426/predictions-from-bsts-model-in-r-are-failing-completely - PUSE UN GENERALIZED LOCAL TREND
-ssd <- AddLocalLevel(ssd, ts_week_covid$gasto_total_na) #AddSemilocalLinearTrend #AddLocalLevel
-# Add weekly seasonal
-ssd <- AddSeasonal(ssd, ts_week_covid$gasto_total_na,nseasons=5, season.duration = 52) #weeks OJO, ESTOS NO SON WEEKS VERDADEROS. PORQUE TENGO MAS DE EUN AÑO
-ssd <- AddSeasonal(ssd, ts_week_covid$gasto_total_na, nseasons = 12, season.duration =4) #years
-# For example, to add a day-of-week component to data with daily granularity, use model.args = list(nseasons = 7, season.duration = 1). To add a day-of-week component to data with hourly granularity, set model.args = list(nseasons = 7, season.duration = 24).
-model1d1 <- bsts(ts_week_covid$gasto_total_na, 
-               state.specification = ssd, #A list with elements created by AddLocalLinearTrend, AddSeasonal, and similar functions for adding components of state. See the help page for state.specification.
-               family ="student", #A Bayesian Analysis of Time-Series Event Count Data. POISSON NO SE PUEDE OCUPAR
-               niter = 20000, 
-               #burn = 200, #http://finzi.psych.upenn.edu/library/bsts/html/SuggestBurn.html Suggest the size of an MCMC burn in sample as a proportion of the total run.
-               seed= 2125)
-#,
-#               dynamic.regression=T)
-#plot(model1d1, main = "Model 1")
-#plot(model1d1, "components")
-
-impact2d1 <- CausalImpact(bsts.model = model1d1,
-                       post.period.response = post_resp)
-plot(impact2d1)+
-xlab("Date")+
-  ylab("Monto Semanal (En miles)")
-  
-  
-burn1d1 <- SuggestBurn(0.1, model1d1)
-
 ```
 
 ```{r nube-de-palabras-gastos, eval=T, fig.height=4, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura 10. Nube de Palabras, Observaciones"}
