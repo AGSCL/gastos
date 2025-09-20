@@ -56,12 +56,12 @@ jobs:
       - name: Install dependencies
         if: always()
         run: |
-          Rscript -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/2024-04-15'))
-          Rscript -e 'install.packages(c("lintr", "rsconnect", "devtools", "kableExtra", "sjPlot", "tsibble", "zoo", "reshape2", "ggiraph", "gplots", "wordcloud", "autoplotly", "tidyverse", "distill", "plotly", "knitr", "survminer", "reader", "rowr", "DataExplorer","SnowballC","readr","scales","CausalImpact", "bsts","DT", "withr", "rmarkdown","plotrix","stringr","stringi","sparklyr","readxl","httr","fUnitRoots","tm","forecast","its.analysis", "lubridate", "tidytext", "sjPlot", "prophet", "xts", "nixtlar", "rmarkdown"), repos = "https://cloud.r-project.org")'
+          Rscript -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/2024-04-15'))"
+          Rscript -e "install.packages(c('lintr', 'rsconnect', 'devtools', 'kableExtra', 'sjPlot', 'tsibble', 'zoo', 'reshape2', 'ggiraph', 'gplots', 'wordcloud', 'autoplotly', 'tidyverse', 'distill', 'plotly', 'knitr', 'survminer', 'reader', 'rowr', 'DataExplorer','SnowballC','readr','scales','CausalImpact', 'bsts','DT', 'withr', 'rmarkdown','plotrix','stringr','stringi','sparklyr','readxl','httr','fUnitRoots','tm','forecast','its.analysis', 'lubridate', 'tidytext', 'sjPlot', 'prophet', 'xts', 'nixtlar', 'rmarkdown'), repos = 'https://cloud.r-project.org')"
           Rscript -e "nixtlar::nixtla_set_api_key(Sys.getenv('API_NIXTLA'))"
           Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA')))"
           Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA_API_KEY')))"
-          Rscript -e "try(nixtlar::nixtla_validate_api_key())"
+          Rscript -e "try(nixtlar::nixtla_validate_api_key())"          
       - name: Render RMarkdown
         if: always()
         run: Rscript -e 'rmarkdown::render("sitio2.Rmd")'
