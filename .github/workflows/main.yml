@@ -62,7 +62,40 @@ jobs:
           Rscript -e "nixtlar::nixtla_set_api_key(Sys.getenv('API_NIXTLA'))"
           Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA')))"
           Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA_API_KEY')))"
-          Rscript -e "try(nixtlar::nixtla_validate_api_key())"          
+          Rscript -e "try(nixtlar::nixtla_validate_api_key())"
+
+      - name: Nixtla Simulated Forecast Test
+        if: always()
+        run: |
+          Rscript - <<'EOF'
+          library(nixtlar)
+
+          # Set API key from environment
+          nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
+
+          # Simulate daily time series data
+          set.seed(123)
+          sim_data <- data.frame(
+            date = seq.Date(from = as.Date("2024-01-01"), by = "day", length.out = 100),
+            y = cumsum(rnorm(100, mean = 0.5, sd = 1))
+          )
+
+          # Try forecast call
+          tryCatch({
+            result <- nixtla_client_forecast(
+              data = sim_data,
+              time_col = "date",
+              value_col = "y",
+              freq = "D",
+              horizon = 10
+            )
+            print("=== Simulated Forecast Result ===")
+            print(result)
+          }, error = function(e) {
+            message("Nixtla simulated forecast failed: ", conditionMessage(e))
+          })
+          EOF
+          
       - name: Render RMarkdown
         if: always()
         run: Rscript -e 'rmarkdown::render("sitio2.Rmd")'
