@@ -278,7 +278,7 @@ theme_custom <- function() {
 
 ```{r generar-base, include=F,warning=F, message=F}
 if(nchar(Sys.getenv("SUPERSECRET"))<2){
-  Sys.setenv("SUPERSECRET"=as.character(read.table("secret_key.txt", quote="\"", comment.char="")))
+  Sys.setenv("SUPERSECRET"=as.character(read.table(paste0(dirname(getwd()),"/secret_key.txt"), quote="\"", comment.char="")))
 }
 if(nchar(Sys.getenv("SUPERSECRET"))<2){
   try(Sys.setenv("SUPERSECRET"=as.character(read.table(paste0(gsub("/gastos","",dirname(rstudioapi::getActiveDocumentContext()$path)),"/secret_key.txt"), quote="\"", comment.char=""))))
@@ -558,7 +558,7 @@ tsdata_gastos_trend<-cbind(tsData,trend=as.vector(tsData_gastos$trend))%>% na.om
 itsa_metro_region_quar2<-
         its.analysis::itsa.model(time = "day", depvar = "trend",data=tsdata_gastos_trend,
                                  interrupt_var = "covid", 
-                                 alpha = 0.05,no.plots = F, bootstrap = TRUE, Reps = 10000, print = F) 
+                                 alpha = 0.05,no.plots = F, bootstrap = TRUE, Reps = 2e2, print = F) 
 print(itsa_metro_region_quar2)
 ```
 </div>
