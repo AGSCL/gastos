@@ -1041,7 +1041,6 @@ if(nchar(Sys.getenv("NIXTLA"))<2){
   nixtlar::nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
 }
 
-
 # Preparar datos en formato requerido por TimeGPT
 uf_timegpt <- uf_serie_corrected %>%
     dplyr::rename(ds = date3, y = value) %>%
