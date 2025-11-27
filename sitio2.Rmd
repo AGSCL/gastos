@@ -1036,8 +1036,10 @@ if(nchar(Sys.getenv("API_NIXTLA"))<2){
   try(Sys.setenv("API_NIXTLA"=as.character(read.table(paste0(gsub("/gastos","",dirname(rstudioapi::getActiveDocumentContext()$path)),"/nixtlar_api_key.txt"), quote="\"", comment.char=""))))
 }
 
-nixtlar::nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
 try(nixtlar::nixtla_set_api_key(Sys.getenv("NIXTLA")))
+if(nchar(Sys.getenv("NIXTLA"))<2){
+  nixtlar::nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
+}
 
 
 # Preparar datos en formato requerido por TimeGPT
@@ -1072,23 +1074,36 @@ full_data <- bind_rows(
     timegpt_fcst %>% mutate(type = "Pronóstico")
 )
 
-# Visualizar resultados
-ggplot(full_data, aes(x = ds, y = TimeGPT)) +
-    # Intervalo de confianza del 95%
-    geom_ribbon(aes(ymin = `TimeGPT-lo-95`, ymax = `TimeGPT-hi-95`), 
+
+# Ensure dates are Date objects
+uf_timegpt <- uf_timegpt %>% mutate(ds = as.Date(ds))
+timegpt_fcst <- timegpt_fcst %>% mutate(ds = as.Date(ds))
+
+ggplot() +
+    # --- FORECAST LAYERS (Map y to 'TimeGPT') ---
+    # 95% Confidence Interval
+    geom_ribbon(data = timegpt_fcst, 
+                aes(x = ds, ymin = `TimeGPT-lo-95`, ymax = `TimeGPT-hi-95`), 
                 fill = "#4B9CD3", alpha = 0.2) +
-    # Intervalo de confianza del 80%
-    geom_ribbon(aes(ymin = `TimeGPT-lo-80`, ymax = `TimeGPT-hi-80`), 
+    # 80% Confidence Interval
+    geom_ribbon(data = timegpt_fcst, 
+                aes(x = ds, ymin = `TimeGPT-lo-80`, ymax = `TimeGPT-hi-80`), 
                 fill = "#4B9CD3", alpha = 0.3) +
-    # Línea histórica
-    geom_line(data = filter(full_data, type == "Histórico"), 
-              aes(color = "Histórico"), size = 1) +
-    # Línea de pronóstico
-    geom_line(data = filter(full_data, type == "Pronóstico"), 
-              aes(color = "Pronóstico"), size = 1) +
-    # Línea vertical separadora
-    geom_vline(xintercept = max(filter(full_data, type == "Histórico")$ds), 
+    # Forecast Line
+    geom_line(data = timegpt_fcst, 
+              aes(x = ds, y = TimeGPT, color = "Pronóstico"), size = 1) +
+
+    # --- HISTORICAL LAYER (Map y to 'y') ---
+    geom_line(data = uf_timegpt, 
+              aes(x = ds, y = y, color = "Histórico"), size = 1) +
+
+    # --- STYLING ---
+    geom_vline(xintercept = max(uf_timegpt$ds), 
                linetype = "dashed", color = "red", size = 0.8) +
+    scale_x_date(date_breaks = "3 months", date_labels = "%b %Y") +
+    scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) +
+    scale_color_manual(name = "Leyenda", 
+                       values = c("Histórico" = "black", "Pronóstico" = "#4B9CD3")) +
     # Configuración del eje x
     scale_x_date(
         date_breaks = "3 months",  # Reduce la frecuencia de las etiquetas
@@ -1103,7 +1118,7 @@ ggplot(full_data, aes(x = ds, y = TimeGPT)) +
     ) +
     # Títulos y subtítulos
     labs(
-        title = "Pronóstico de Serie Temporal con TimeGPT",
+        title = "Pronóstico de UF, Serie Temporal con TimeGPT",
         subtitle = "Intervalos de confianza al 80% (más oscuro) y 95% (más claro)",
         x = "Fecha",
         y = "Valor",
