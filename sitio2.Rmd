@@ -248,6 +248,8 @@ if(!require(janitor)){install.packages("janitor")}
 if(!require(DT)){install.packages("DT")}
 if(!require(tidytext)){install.packages("tidytext")}
 
+if(!require(autoplotly)){devtools::install_github("terrytangyuan/autoplotly")}
+
 require(ggplot2)
 require(dplyr)
 require(data.table)
@@ -385,12 +387,24 @@ gplots::plotmeans(gasto_media ~ gastador_nombre, main="Promedio de gasto por gas
 ```
 
 ```{r comp_medias-por-diosi, echo=T, fig.height=4, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Antes y Depsués de Diosi"}
+library(ggplot2)
 
-par(mfrow=c(1,2)) 
-gplots::plotmeans(gasto_media ~ gastador_nombre, main="Antes de Diosi", data=ts_gastos_casa_week_treat[ts_gastos_casa_week_treat$treat==0,], xlab="", ylab="", ylim=c(0,70000))
-
-gplots::plotmeans(gasto_media ~ gastador_nombre, main="Después de Diosi", data=ts_gastos_casa_week_treat[ts_gastos_casa_week_treat$treat==1,], xlab="", ylab="",ylim=c(0,70000))
-
+ggplot(
+  ts_gastos_casa_week_treat,
+  aes(x = gastador_nombre, y = gasto_media)
+) +
+  stat_summary(fun = mean, geom = "point", size = 3, color = "steelblue") +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.2) +
+  facet_wrap(~ treat, labeller = labeller(
+    treat = c(`0` = "Antes de Diosi", `1` = "Después de Diosi")
+  )) +
+  coord_cartesian(ylim = c(0, 70000)) +
+  labs(x = "", y = "") +
+  theme_minimal(base_size = 13) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 ```
 
 ```{r linea-tiempo-gastador-gastos, echo=T, fig.height=4, fig.width=8, warning=FALSE, fig.align = "center", message=F ,fig.show='hide'}
@@ -420,7 +434,7 @@ gg <- Gastos_casa %>%
   labs(y="Gastos (en miles)",x="Semanas y Meses", subtitle="Interlineado, incorporación de la Diosi; Azul= Tami; Rojo= Andrés") + ggtitle( "Figura 4. Gastos por Gastador") +
   scale_y_continuous(labels = f <- function(x) paste0(x/1000)) + 
   scale_color_manual(name = "Gastador", values= c("blue", "red"), labels = c("Tami", "Andrés")) +
-  scale_x_yearweek(date_breaks = "1 month", minor_breaks = "1 week", labels=scales::date_format("%m/%y")) +
+  tsibble::scale_x_yearweek(date_breaks = "1 month", minor_breaks = "1 week", labels=scales::date_format("%m/%y")) +
   theme(axis.text.x = element_text(vjust = 0.5,angle = 35), legend.position='bottom')+
      theme(
     panel.border = element_blank(), 
@@ -542,150 +556,196 @@ theme(axis.text.x = element_text(angle = 90, hjust = 1))+
   theme(strip.text = element_text(size = 12))
 ```
 
-
-<div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:350px; overflow-x: scroll; width:100%">
-```{r itsa2, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual"}
-#tsData_gastos$trend
-#Using the inputted variables, a Type-2 Sum Squares ANCOVA Lagged Dependent Variable model is fitted which estimates the difference in means between interrupted and non-interrupted time periods, while accounting for the lag of the dependent variable and any further specified covariates.
-#Typically such analyses use Auto-regressive Integrated Moving Average (ARIMA) models to handle the serial dependence of the residuals of a linear model, which is estimated either as part of the ARIMA process or through a standard linear regression modeling process [9,17]. All such time series methods enable the effect of the event to be separated from general trends and serial dependencies in time, thereby enabling valid statistical inferences to be made about whether an intervention has had an effect on a time series.
-   #it uses Type-2 Sum Squares ANCOVA Lagged Dependent Variable model
-   #ITSA model da cuenta de observaciones autocorrelacionadas e impactos dinámicos mediante una regresión de deltas en rezagados. Una vez que se incorporan en el modelo, se controlan. 
-#residual autocorrelation assumptions
-#TSA allows the model to account for baseline levels and trends present in the data therefore allowing us to attribute significant changes to the interruption
-#RDestimate(all~agecell,data=metro_region,cutpoint = 21)
-tsdata_gastos_trend<-cbind(tsData,trend=as.vector(tsData_gastos$trend))%>% na.omit()
-
-itsa_metro_region_quar2<-
-        its.analysis::itsa.model(time = "day", depvar = "trend",data=tsdata_gastos_trend,
-                                 interrupt_var = "covid", 
-                                 alpha = 0.05,no.plots = F, bootstrap = TRUE, Reps = 2e2, print = F) 
-print(itsa_metro_region_quar2)
-```
-</div>
-
 Ahora con las tendencias descompuestas
  
-```{r linea-tiempo-gastador-gastos-tipo, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual"}
-
-require(zoo)
-require(scales)
+```{r linea-tiempo-gastador-gastos-tipo, eval=T, echo=T, fig.height=16, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual"}
+#require(zoo)
+Gastos_casa_gastador_cat_gasto<- 
 Gastos_casa %>%
     dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
     dplyr::mutate(fecha2=strftime(fecha, format = "%Y-W%V")) %>%
     dplyr::mutate(gastador=ifelse(gastador=="Andrés",1,0)) %>%
     dplyr::mutate(treat=ifelse(fecha2>"2019-W26",1,0)) %>% 
-    dplyr::mutate(gasto= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
-                  gasto=="aspiradora"~"Electrodomésticos/mantención casa",
-                  gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
-                  gasto=="Tina"~"Electrodomésticos/mantención casa",
-                  gasto=="Nexium"~"Farmacia",
-                  gasto=="donaciones"~"Donaciones/regalos",
-                  gasto=="Regalo chocolates"~"Donaciones/regalos",
-                  gasto=="filtro piscina msp"~"Electrodomésticos/mantención casa",
-                  gasto=="Chromecast"~"Electrodomésticos/mantención casa",
-                  gasto=="Muebles ratan"~"Electrodomésticos/mantención casa",
-                  gasto=="Vacuna Influenza"~"Farmacia",
-                  gasto=="Easy"~"Electrodomésticos/mantención casa",
-                  gasto=="Sopapo"~"Electrodomésticos/mantención casa",
-                  gasto=="filtro agua"~"Electrodomésticos/mantención casa",
-                  gasto=="ropa tami"~"Donaciones/regalos",
-                  gasto=="yaz"~"Farmacia",
-                  gasto=="Yaz"~"Farmacia",
-                  gasto=="Remedio"~"Farmacia",
-                  gasto=="Entel"~"VTR",
-                  gasto=="Kerosen"~"Gas/Bencina",
-                  gasto=="Parafina"~"Gas/Bencina",
-                  gasto=="Plata basurero"~"Donaciones/regalos",
-                  gasto=="Matri Andrés Kogan"~"Donaciones/regalos",
-                  gasto=="Wild Protein"~"Comida",
-                  gasto=="Granola Wild Foods"~"Comida",
-                  gasto=="uber"~"Transporte",
-                  gasto=="Uber Reñaca"~"Transporte",
-                  gasto=="filtro piscina mspa"~"Electrodomésticos/mantención casa",
-                  gasto=="Limpieza Alfombra"~"Electrodomésticos/mantención casa",
-                  gasto=="Aspiradora"~"Electrodomésticos/mantención casa",
-                  gasto=="Limpieza alfombras"~"Electrodomésticos/mantención casa",
-                  gasto=="Pila estufa"~"Electrodomésticos/mantención casa",
-                  gasto=="Reloj"~"Electrodomésticos/mantención casa",
-                  gasto=="Arreglo"~"Electrodomésticos/mantención casa",
-                  gasto=="Pan Pepperino"~"Comida",
-                  gasto=="Cookidoo"~"Comida",
-                  gasto=="remedios"~"Farmacia",
-                  gasto=="Bendina Reñaca"~"Gas/Bencina",
-                  gasto=="Bencina Reñaca"~"Gas/Bencina",
-                  gasto=="Vacunas Influenza"~"Farmacia",
-                  gasto=="Remedios"~"Farmacia",
-                  gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
-                  #2024
-                  gasto=="cartero"~"Correo",
-                  gasto=="correo"~"Correo",
-                  gasto=="Gaviscón y Paracetamol"~"Farmacia",
-                  gasto=="Regalo Matri Cony"~"Donaciones/regalos",
-                  gasto=="Regalo Matri Chepa"~"Donaciones/regalos",
-                  gasto=="Aporte Basureros"~"Donaciones/regalos",
-                  gasto=="donación"~"Donaciones/regalos",
-                  gasto=="Plata Reciclaje y Basurero"~"Donaciones/regalos",
-                  gasto=="basureros"~"Donaciones/regalos",
-                  gasto=="Microondas regalo"~"Donaciones/regalos",
-                  gasto=="Cruz Verde"~"Farmacia",
-                  gasto=="Remedios Covid"~"Farmacia",      
-                  gasto=="nacho"~"Electrodomésticos/mantención casa",
-                  gasto=="Jardinero"~"Electrodomésticos/mantención casa",
-                  gasto=="mantencion toyotomi"~"Electrodomésticos/mantención casa",
-                  gasto=="Cámaras Seguridad M.Barrios"~"Electrodomésticos/mantención casa",      
-                  gasto=="Uber cumple papá"~"Transporte",
-                  gasto=="Uber"~"Transporte",
-                  gasto=="Uber Matri Cony"~"Transporte",
-                  gasto=="Bencina + tag"~"Gas/Bencina",
-                  gasto=="Bencina + Tag cumple Delox"~"Gas/Bencina",
-                  gasto=="Bencina + peajes Maite"~"Gas/Bencina",
-                  gasto=="Crunchyroll"~"Netflix",
-                  gasto=="Crunchyroll"~"Netflix",
-                  gasto=="Incoludido"~"Enceres",
-                  gasto=="Cortina baño"~"Electrodomésticos/mantención casa",
-                  gasto=="Forro cortina ducha"~"Electrodomésticos/mantención casa",
-                  gasto=="Brussels"~"Comida",
-                  gasto=="Tres toques"~"Enceres",
-                  gasto=="Transferencia"~"Otros",
-                  gasto=="prestamo"~"Otros",
-                  gasto=="Préstamo Andrés"~"Otros",
-                  gasto=="mouse"~"Otros",
-                  gasto=="lamina"~"Otros",
-      T~gasto)) %>% 
-    dplyr::group_by(gastador, fecha,gasto, .drop=F) %>%
-    #dplyr::mutate(fecha_simp=week(parse_date(fecha))) %>% 
-#    dplyr::mutate(fecha_simp=tsibble::yearweek(fecha)) %>%#después de  diosi. Junio 24, 2019	
+    dplyr::mutate(
+      # 1) Normalización básica de texto
+      gasto_clean = gasto %>%
+        stringr::str_squish() %>%                   # espacios extra
+        stringr::str_to_lower() %>%                 # todo en minúsculas
+        stringr::str_replace_all(",", "") %>%       # quita comas, si hubiera
+        stringr::str_replace_all("\\s+/\\s+", "/") %>%  # "a / b" -> "a/b"
+        stringi::stri_trans_general("Latin-ASCII"),  # sin tildes
+      
+      # 2) Unificar etiquetas que son lo mismo
+      gasto_clean = dplyr::case_when(
+        gasto_clean %in% c("uber", "uber reñaca", "uber matri cony", "uber cumple papa") ~ "uber",
+        gasto_clean %in% c("yaz", "yaz ") ~ "yaz",
+        gasto_clean %in% c("limpieza alfombras", "limpieza alfombra") ~ "limpieza alfombras",
+        gasto_clean %in% c("vacuna influenza", "vacunas influenza") ~ "vacuna influenza",
+        gasto_clean %in% c("aspiradora", "aspiradora ") ~ "aspiradora",
+        gasto_clean %in% c("plata reciclaje y basurero",
+                           "plata basurero", "plata basureros",
+                           "plata fiestas patrias basureros",
+                           "aporte basureros", "basureros") ~ "basureros",
+        gasto_clean %in% c("donaciones", "donacion") ~ "donacion",
+        gasto_clean %in% c("prestamo", "prestamo andres", "prestamo andres", "prestamo andres ") ~ "prestamo andres",
+        TRUE ~ gasto_clean
+      ),
+      # 3) (Opcional) Variable más agregada de tipo de gasto
+      gasto_cat = dplyr::case_when(
+        gasto_clean == "comida"                       ~ "Comida",
+        gasto_clean %in% c("enceres")                 ~ "Enceres",
+        gasto_clean == "diosi"                        ~ "Diosi",
+        gasto_clean %in% c("vtr", "netflix",
+                           "crunchyroll", "entel")    ~ "Streaming/Telefonia",
+        gasto_clean %in% c("electricidad", "gas",
+                           "parafina", "kerosen")     ~ "Servicios básicos",
+        gasto_clean %in% c("agua")                    ~ "Agua",
+        gasto_clean %in% c("uber", "transporte",
+                           "gas/bencina", "bencina + tag",
+                           "bencina reñaca",
+                           "bencina + peajes maite",
+                           "bencina + tag cumple delox") ~ "Transporte",
+        gasto_clean %in% c("farmacia", "remedio",
+                           "remedios", "remedios covid",
+                           "gaviscón y paracetamol",
+                           "nexium")                 ~ "Farmacia/Salud",
+        gasto_clean %in% c("electrodomesticos/mantencion casa",
+                           "microondas regalo", "aspiradora",
+                           "muebles ratan", "mouse",
+                           "reloj")                  ~ "Electrodomesticos",
+        TRUE ~ stringr::str_to_title(gasto_clean)  # default: limpio pero no agregado
+      )
+    ) %>%
+    dplyr::mutate(
+      gasto_cat10 = dplyr::case_when(
+        # 1) COMIDA (incluye los “comida” especiales de tu criterio viejo)
+        gasto_cat %in% c(
+          "Comida",
+          "Pan Pepperino",
+          "Cookidoo",
+          "Granola Wild Foods",
+          "Wild Protein",
+          "Brussels"
+        ) ~ "Comida",
+        # 2) ENCERES
+        gasto_cat %in% c(
+          "Enceres",
+          "Incoludido",
+          "Tres Toques"
+        ) ~ "Enceres",
+        # 3) DIOSI
+        gasto_cat == "Diosi" ~ "Diosi",
+        # 4) SERVICIOS BÁSICOS (agua, luz, gas/bencina, etc.)
+        gasto_cat %in% c(
+          "Servicios básicos",
+          "Agua",
+          "Bencina Renaca"
+        ) ~ "Servicios básicos",
+        # 5) FARMACIA (todo lo que en tu criterio iba a Farmacia)
+        gasto_cat %in% c(
+          "Farmacia/Salud",
+          "Yaz",
+          "Gaviscon Y Paracetamol",
+          "Vacuna Influenza",
+          "Cruz Verde"
+        ) ~ "Farmacia",
+        # 6) TRANSPORTE (uber, viajes, bencina que antes era Transporte)
+        gasto_cat %in% c(
+          "Transporte",
+          "Uber Renaca",
+          "Viaje Brasil"
+        ) ~ "Transporte",
+        # 7) ELECTRODOMÉSTICOS / MANTENCIÓN CASA
+        gasto_cat %in% c(
+          "Electrodomesticos",
+          "Cortina Bano",
+          "Filtro Agua",
+          "Filtro Piscina Mspa",
+          "Mantencion Toyotomi",
+          "Limpieza Alfombras",
+          "Sopapo",
+          "Pila Estufa",
+          "Jardinero",
+          "Camaras Seguridad M.barrios",
+          "Pago Camaras Mb",
+          "Tina",
+          "Nacho",
+          "Lamina",
+          "Chromecast",
+          "Easy"
+        ) ~ "Electrodomesticos/mantencion casa",
+        # 8) STREAMING / TELEFONÍA (Netflix / VTR / Crunchyroll / Entel, que ya aglutinaste en gasto_cat)
+        gasto_cat %in% c(
+          "Streaming/Telefonia"
+        ) ~ "Streaming/Telefonia",
+        # 9) DONACIONES / REGALOS / APORTES
+        gasto_cat %in% c(
+          "Basureros",
+          "Donacion",
+          "Regalo Chocolates",
+          "Regalo Matri Chepa",
+          "Regalo Matri Cony",
+          "Matri Andres Kogan",
+          "Rgalo Chepa",
+          "Ropa",
+          "Ropa Tami",
+          "Assistcard Viaje"
+        ) ~ "Donaciones/regalos",
+        # 10) TODO LO DEMÁS → OTROS
+        TRUE ~ "Otros"
+      )
+    ) %>%
+    dplyr::group_by(gastador, fecha, gasto_cat10, .drop=F) %>%
     dplyr::summarise(monto=sum(monto)) %>% 
-    dplyr::mutate(gastador_nombre=plyr::revalue(as.character(gastador), c("0" = "Tami", "1"="Andrés"))) %>% 
-  ggplot2::ggplot(aes(x = fecha, y = monto, color=as.factor(gastador_nombre))) +
+    dplyr::mutate(gastador_nombre=plyr::revalue(as.character(gastador), c("0" = "Tami", "1"="Andrés")))
+
+
+
+
+Gastos_casa_gastador_cat_gasto %>%
+    dplyr::mutate(fecha = as.Date(fecha)) %>%       # por si viene como POSIXct
+    dplyr::group_by(gasto_cat10) %>%                     # opcional: quita ítems con 1 obs
+    dplyr::filter(n() >= 6) %>%   
+    dplyr::ungroup() %>%
+ggplot2::ggplot(aes(x = fecha, y = monto, color=as.factor(gastador_nombre))) +
   #stat_summary(geom = "line", fun.y = median, size = 1, alpha=0.5, aes(color="blue")) +
   geom_line(size=1) +
-  facet_grid(gasto~.)+
+  facet_grid(gasto_cat10~.)+
   geom_vline(xintercept = as.Date("2019-06-24"),linetype = "dashed") +
-  labs(y="Gastos (en miles)",x="Semanas y Meses", subtitle="Interlineado, incorporación de la Diosi; Azul= Tami; Rojo= Andrés") +
-  ggtitle( "Figura 6. Gastos Semanales por Gastador e ítem (media)") +
+  labs(y="Gastos (en miles)",x="Años", subtitle="Interlineado, incorporación de la Diosi; Azul= Tami; Rojo= Andrés") +
+  ggtitle( "Figura 6. Gastos Semanales por Gastador e ítem (media) [n>5]") +
   scale_y_continuous(labels = f <- function(x) paste0(x/1000)) + 
   scale_color_manual(name = "Gastador", values= c("blue", "red"), labels = c("Tami", "Andrés")) +
-  scale_x_yearweek(breaks = "1 month", minor_breaks = "1 week", labels=date_format("%m/%y")) +
+  tsibble::scale_x_yearweek(breaks = "1 year", minor_breaks = "3 months", labels= scales::date_format("%m/%y")) +
   guides(color = F)+
   theme_custom() +
   theme(axis.text.x = element_text(vjust = 0.5,angle = 35)) +
   theme(
     panel.border = element_blank(), 
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(), 
+    #panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(), 
+    panel.grid.minor = element_line(color = "grey90", size = 0.3),
+    panel.grid.major = element_line(color = "grey75", size = 0.5),    
     axis.line = element_line(colour = "black")
     )
 ```
 
 ```{r mstl, eval=T, fig.height=8, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto descompuesto en Tendencias"}
 # Apply MSTL decomposition
-mstl_data_autplt <- forecast::mstl(Gastos_casa$monto, lambda = "auto",iterate=5000000,start = 
+
+Gastos_casa |> 
+    dplyr::mutate(fecha= readr::parse_date(fecha, format="%d/%m/%Y")) |> 
+    dplyr::arrange(fecha) |>  pull(monto) -> monto_ts
+Gastos_casa |> 
+    dplyr::mutate(fecha= readr::parse_date(fecha, format="%d/%m/%Y")) |> 
+    dplyr::arrange(fecha) |>  pull(fecha) -> fecha_ts
+
+mstl_data_autplt <- forecast::mstl(monto_ts, lambda = "auto",iterate=5000000,start = 
 lubridate::decimal_date(as.Date("2019-03-03")))
 
 # Convert the decomposed time series to a data frame
 mstl_df <- data.frame(
-  Date = as.Date(Gastos_casa$fecha, format="%d/%m/%Y"),
+  Date = as.Date(fecha_ts, format="%d/%m/%Y"),
   Data = as.numeric(mstl_data_autplt[, "Data"]),
   Trend = as.numeric(mstl_data_autplt[, "Trend"]),
   Remainder = as.numeric(mstl_data_autplt[, "Remainder"])
@@ -693,13 +753,16 @@ mstl_df <- data.frame(
 
 # Reshape the data frame for ggplot2
 mstl_long <- mstl_df %>%
-  pivot_longer(cols = -Date, names_to = "Component", values_to = "Value")
+  dplyr::arrange(Date) %>%
+  tidyr::pivot_longer(cols = -Date, names_to = "Component", values_to = "Value")
+
+mstl_long_filtered <- mstl_long %>% dplyr::filter(!(Date %in% (mstl_long %>% dplyr::distinct(Date) %>% top_n(7, Date) %>% pull(Date))))
 
 # Plotting with ggplot2
-ggplot(mstl_long, aes(x = Date, y = Value)) +
+ggplot(mstl_long_filtered, aes(x = Date, y = Value)) +
   geom_line() +
   theme_bw() + 
-  labs(title = "Descomposición MSTL", x = "Fecha", y = "Valor") +
+  labs(title = "Descomposición MSTL (- 7 days)", x = "Fecha", y = "Valor") +
   scale_x_date(date_breaks = "3 months", date_labels = "%m-%Y") +
   facet_wrap(~ Component, scales = "free_y", ncol = 1) +
   theme(strip.text = element_text(size = 12),
@@ -729,233 +792,173 @@ ts_week_covid$gasto_total[which(ts_week_covid$covid==0)]
 ```
 
 ```{r nube-de-palabras-gastos, eval=T, fig.height=4, fig.width=8, echo=T, warning=FALSE, fig.align = "center", message=F, caption="Figura 10. Nube de Palabras, Observaciones"}
-corpus <- Corpus(VectorSource(Gastos_casa$obs)) # formato de texto
-d  <- tm_map(corpus, tolower)
-d  <- tm_map(d, stripWhitespace)
-d <- tm_map(d, removePunctuation)
-d <- tm_map(d, removeNumbers)
-d <- tm_map(d, removeWords, stopwords("spanish"))
-d <- tm_map(d, removeWords, "menos")
-tdm <- TermDocumentMatrix(d)
-m <- as.matrix(tdm) #lo vuelve una matriz
-v <- sort(rowSums(m),decreasing=TRUE) #lo ordena y suma
-df <- data.frame(word = names(v),freq=v) # lo nombra y le da formato de data.frame
-#findFreqTerms(tdm)
-#require(devtools)
-#install_github("lchiffon/wordcloud2")
-#wordcloud2::wordcloud2(v, size=1.2)
-wordcloud(words = df$word, freq = df$freq, 
-          max.words=100, random.order=FALSE, rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"), main="Figura 7. Nube de Palabras, Observaciones")
+# 1) Create corpus
+corpus <- tm::Corpus(tm::VectorSource(Gastos_casa$obs))
+
+# 2) Preprocess text
+d <- corpus |>
+  tm::tm_map(tm::content_transformer(tolower)) |>
+  tm::tm_map(tm::stripWhitespace) |>
+  tm::tm_map(tm::removePunctuation) |>
+  tm::tm_map(tm::removeNumbers) |>
+  tm::tm_map(tm::removeWords, tm::stopwords("spanish")) |>
+  tm::tm_map(tm::removeWords, "menos")
+
+# 3) Term-document matrix
+tdm <- tm::TermDocumentMatrix(d)
+
+# 4) Convert to matrix
+m <- base::as.matrix(tdm)
+
+# 5) Frequencies
+v  <- base::sort(base::rowSums(m), decreasing = TRUE)
+
+df <- base::data.frame(
+  word = base::names(v),
+  freq = v,
+  row.names = NULL
+)
+
+# 6) Wordcloud
+wordcloud::wordcloud(
+  words       = df$word,
+  freq        = df$freq,
+  max.words   = 100,
+  random.order= FALSE,
+  rot.per     = 0.35,
+  colors      = RColorBrewer::brewer.pal(8, "Dark2"),
+  scale       = c(4, 0.5)
+)
+
 ```
 
 ::: controlly
 ```{r month-gasto-recategorizar, echo=T,fig.align='center', fig.pos='H', eval=T, message=FALSE, warning=F}
-fit_month_gasto <- Gastos_casa %>%
-    dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
-    dplyr::mutate(fecha_month=strftime(fecha, format = "%Y-%m")) %>%
-    dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))%>%
-    dplyr::mutate(gasto2= dplyr::case_when(gasto=="Gas"~"Gas/Bencina",
-                  gasto=="aspiradora"~"Electrodomésticos/mantención casa",
-                  gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
-                  gasto=="Tina"~"Electrodomésticos/mantención casa",
-                  gasto=="Nexium"~"Farmacia",
-                  gasto=="donaciones"~"Donaciones/regalos",
-                  gasto=="Regalo chocolates"~"Donaciones/regalos",
-                  gasto=="filtro piscina msp"~"Electrodomésticos/mantención casa",
-                  gasto=="Chromecast"~"Electrodomésticos/mantención casa",
-                  gasto=="Muebles ratan"~"Electrodomésticos/mantención casa",
-                  gasto=="Vacuna Influenza"~"Farmacia",
-                  gasto=="Easy"~"Electrodomésticos/mantención casa",
-                  gasto=="Sopapo"~"Electrodomésticos/mantención casa",
-                  gasto=="filtro agua"~"Electrodomésticos/mantención casa",
-                  gasto=="ropa tami"~"Donaciones/regalos",
-                  gasto=="yaz"~"Farmacia",
-                  gasto=="Yaz"~"Farmacia",
-                  gasto=="Remedio"~"Farmacia",
-                  gasto=="Entel"~"VTR",
-                  gasto=="Kerosen"~"Gas/Bencina",
-                  gasto=="Parafina"~"Gas/Bencina",
-                  gasto=="Plata basurero"~"Donaciones/regalos",
-                  gasto=="Matri Andrés Kogan"~"Donaciones/regalos",
-                  gasto=="Wild Protein"~"Comida",
-                  gasto=="Granola Wild Foods"~"Comida",
-                  gasto=="uber"~"Transporte",
-                  gasto=="Uber Reñaca"~"Transporte",
-                  gasto=="filtro piscina mspa"~"Electrodomésticos/mantención casa",
-                  gasto=="Limpieza Alfombra"~"Electrodomésticos/mantención casa",
-                  gasto=="Aspiradora"~"Electrodomésticos/mantención casa",
-                  gasto=="Limpieza alfombras"~"Electrodomésticos/mantención casa",
-                  gasto=="Pila estufa"~"Electrodomésticos/mantención casa",
-                  gasto=="Reloj"~"Electrodomésticos/mantención casa",
-                  gasto=="Arreglo"~"Electrodomésticos/mantención casa",
-                  gasto=="Pan Pepperino"~"Comida",
-                  gasto=="Cookidoo"~"Comida",
-                  gasto=="remedios"~"Farmacia",
-                  gasto=="Bendina Reñaca"~"Gas/Bencina",
-                  gasto=="Bencina Reñaca"~"Gas/Bencina",
-                  gasto=="Vacunas Influenza"~"Farmacia",
-                  gasto=="Remedios"~"Farmacia",
-                  gasto=="Plata fiestas patrias basureros"~"Donaciones/regalos",
-                  #2024
-                  gasto=="cartero"~"Correo",
-                  gasto=="correo"~"Correo",
-                  gasto=="Gaviscón y Paracetamol"~"Farmacia",
-                  gasto=="Regalo Matri Cony"~"Donaciones/regalos",
-                  gasto=="Regalo Matri Chepa"~"Donaciones/regalos",
-                  gasto=="Aporte Basureros"~"Donaciones/regalos",
-                  gasto=="donación"~"Donaciones/regalos",
-                  gasto=="Plata Reciclaje y Basurero"~"Donaciones/regalos",
-                  gasto=="basureros"~"Donaciones/regalos",
-                  gasto=="Microondas regalo"~"Donaciones/regalos",
-                  gasto=="Cruz Verde"~"Farmacia",
-                  gasto=="Remedios Covid"~"Farmacia",      
-                  gasto=="nacho"~"Electrodomésticos/mantención casa",
-                  gasto=="Jardinero"~"Electrodomésticos/mantención casa",
-                  gasto=="mantencion toyotomi"~"Electrodomésticos/mantención casa",
-                  gasto=="Cámaras Seguridad M.Barrios"~"Electrodomésticos/mantención casa",      
-                  gasto=="Uber cumple papá"~"Transporte",
-                  gasto=="Uber"~"Transporte",
-                  gasto=="Uber Matri Cony"~"Transporte",
-                  gasto=="Bencina + tag"~"Gas/Bencina",
-                  gasto=="Bencina + Tag cumple Delox"~"Gas/Bencina",
-                  gasto=="Bencina + peajes Maite"~"Gas/Bencina",
-                  gasto=="Crunchyroll"~"Netflix",
-                  gasto=="Crunchyroll"~"Netflix",
-                  gasto=="Incoludido"~"Enceres",
-                  gasto=="Cortina baño"~"Electrodomésticos/mantención casa",
-                  gasto=="Forro cortina ducha"~"Electrodomésticos/mantención casa",
-                  gasto=="Brussels"~"Comida",
-                  gasto=="Tres toques"~"Enceres",
-                  gasto=="Transferencia"~"Otros",
-                  gasto=="prestamo"~"Otros",
-                  gasto=="Préstamo Andrés"~"Otros",
-                  gasto=="mouse"~"Otros",
-                  gasto=="lamina"~"Otros",
-      T~gasto)) %>% 
-  dplyr::mutate(fecha_month=factor(fecha_month, levels=format(seq(from = as.Date("2019-03-03"), to = as.Date(substr(Sys.time(),1,10)), by = "1 month"),"%Y-%m")))%>% 
-  dplyr::mutate(gasto2=factor(gasto2, levels=c("Agua", "Comida", "Comunicaciones","Electricidad", "Enceres", "Farmacia", "Gas/Bencina", "Diosi", "donaciones/regalos", "Electrodomésticos/ Mantención casa", "VTR", "Netflix", "Otros")))%>% 
-    dplyr::group_by(fecha_month, gasto2, .drop=F)%>%
-    dplyr::summarise(gasto_total=sum(monto, na.rm = T)/1000)%>%
-  data.frame() %>% na.omit()
 
-fit_month_gasto_25<-
-fit_month_gasto %>% 
-    #dplyr::filter()
-    dplyr::filter(grepl("2025",fecha_month)) %>% 
-    #sacar el ultimo mes
-    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
-    dplyr::group_by(gasto2) %>% 
-    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()%>% ungroup()
+fit_month_gasto <- Gastos_casa_gastador_cat_gasto %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(
+    # month string YYYY-MM
+    fecha_month = base::format(fecha, "%Y-%m")
+  ) %>%
+  dplyr::mutate(
+    # order months from 2019-03 until today (like in your original code)
+    fecha_month = base::factor(
+      fecha_month,
+      levels = base::format(
+        base::seq(
+          from = base::as.Date("2019-03-03"),
+          to   = base::as.Date(base::substr(base::Sys.time(), 1, 10)),
+          by   = "1 month"
+        ),
+        "%Y-%m"
+      )
+    )
+  ) %>%
+  dplyr::group_by(fecha_month, gasto_cat10, .drop = FALSE) %>%
+  dplyr::summarise(
+    gasto_total = base::sum(monto, na.rm = TRUE) / 1000,
+    .groups = "drop"
+  ) %>%
+  base::as.data.frame()
 
-fit_month_gasto_24<-
-fit_month_gasto %>% 
-    #dplyr::filter()
-    dplyr::filter(grepl("2024",fecha_month)) %>% 
-    #sacar el ultimo mes
-    dplyr::filter(as.character(format(as.Date(substr(Sys.time(),1,10)),"%Y-%m"))!=fecha_month) %>% 
-    dplyr::group_by(gasto2) %>% 
-    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()%>% ungroup()
+#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:
+#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:
+#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:
+current_ym <- base::format(base::Sys.Date(), "%Y-%m")
 
-fit_month_gasto_23<-
-fit_month_gasto %>% 
-    #dplyr::filter()
-    dplyr::filter(grepl("2023",fecha_month)) %>% 
-    dplyr::group_by(gasto2) %>% 
-    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()%>% ungroup()
+tabla_gasto_year_item <-
+    fit_month_gasto %>%
+    dplyr::mutate(
+        year = base::substr(base::as.character(fecha_month), 1, 4),
+        ym   = base::as.character(fecha_month)
+    ) %>%
+    # opcional: excluir el mes actual (incompleto)
+    dplyr::filter(ym != current_ym) %>%
+    # si quieres solo ciertos años:
+    # dplyr::filter(year %in% c("2020","2021","2022","2023","2024","2025")) %>%
+    dplyr::group_by(gasto_cat10, year) %>%
+    dplyr::summarise(
+        gasto_prom = base::mean(gasto_total, na.rm = TRUE),
+        .groups    = "drop"
+    ) %>%
+    tidyr::pivot_wider(
+        names_from  = year,
+        values_from = gasto_prom
+    ) %>%
+    janitor::adorn_totals()  # agrega fila "Total"
 
-fit_month_gasto_22<-
-fit_month_gasto %>% 
-    #dplyr::filter()
-    dplyr::filter(grepl("2022",fecha_month)) %>% 
-    dplyr::group_by(gasto2) %>% 
-    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()%>% ungroup()
-
-fit_month_gasto_21<-
-fit_month_gasto %>% 
-    #dplyr::filter()
-    dplyr::filter(grepl("2021",fecha_month)) %>% 
-    dplyr::group_by(gasto2) %>% 
-    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame()%>% ungroup()
-
-
-fit_month_gasto_20<-
-fit_month_gasto %>% 
-    #dplyr::filter()
-    dplyr::filter(grepl("2020",fecha_month)) %>% 
-    dplyr::group_by(gasto2) %>% 
-    dplyr::summarise(gasto_prom=mean(gasto_total, na.rm=T)) %>% 
-  data.frame() %>% ungroup()
-
-fit_month_gasto_25 %>% 
-dplyr::right_join(fit_month_gasto_24,by="gasto2") %>%
-dplyr::right_join(fit_month_gasto_23,by="gasto2") %>%
-dplyr::right_join(fit_month_gasto_22,by="gasto2") %>%
-dplyr::right_join(fit_month_gasto_21,by="gasto2") %>% 
-dplyr::right_join(fit_month_gasto_20,by="gasto2") %>% 
-  janitor::adorn_totals() %>% 
-  #dplyr::select(-3)%>% 
-  knitr::kable(format = "markdown", size=12, col.names= c("Item","2025","2024","2023","2022","2021","2020"))
+tabla_gasto_year_item |> 
+  knitr::kable("markdown",
+    caption = "Gasto Promedio Mensual por Ítem y Año (suma por categoría y mes)",
+    digits  = 1)
 ```
 :::
  
 
 ```{r month-gasto-recategorizar2, echo=FALSE}
-library("tidytext")
+# (Opcional) Cargar paquetes si quieres autocomplete, pero el código abajo usa todo namespaced
+# library(dplyr)
+# library(tidytext)
+# library(ggplot2)
+# library(stringi)
+# library(tm)
+# library(tidytext)
 
-chat <- data.frame(Gastos_casa$obs) %>%
- dplyr::mutate(count_character= nchar(Gastos_casa.obs), 
- words= nchar(gsub('[^ ]+', '',Gastos_casa.obs))+1)
+# 1) Base de texto
+chat <- base::data.frame(Gastos_casa$obs) |>
+  dplyr::rename(Gastos_casa.obs = Gastos_casa.obs) |>
+  dplyr::mutate(
+    count_character = base::nchar(Gastos_casa.obs),
+    words = base::nchar(base::gsub("[^ ]+", "", Gastos_casa.obs)) + 1
+  )
 
-#similar to chat but we are not removing the entries where author is null
+# 2) Stopwords personalizadas
+to_remove <- base::c(
+  tm::stopwords(kind = "spanish"),
+  "usted", "ahí", "aquí", "acá", "pues", "tal", "tan", "así", "dijo", "dicen",
+  "xq", "status", "wnes", "jaja", "jajaj", "tb", "t", "mensaje",
+  "cómo", "sino", "entonces", "aunque", "don", "doña", "nomas", "si", "pa",
+  "jajajaja", "jjaja", "alla", "creo", "cada", "le", "el", "la", "en",
+  "weon", "wea", "q", "jajaja", "ajaja", "igual", "pasa", "pasan", "hace",
+  "manda", "cacha", "multimedia", "wn", "po", "cn", "pal", "ta",
+  "ajajajja", "ajajajjaja", "seee", "ajajajajja", "wajajajajajjaja",
+  "wajajaja", "10", "1", "pq", "jajajajajajaja", "k",
+  "toda", "ahora", "tema", "omitido", "que", "Porqué", "siempre", "https",
+  "toy", "mas", "2", "3", "hacen", "hacer", "ajajajajaja", "jajajajajaja",
+  "jajajajaja", "jajajajaja"
+)
 
-to_remove <- c(stopwords(kind="spanish"), c("usted", "ahí", "aquí", "acá", 
-                                              "pues", "tal", "tan", "así", "dijo", "dicen","xq","status","wnes","jaja","jajaj","tb","t","mensaje",
-                                              "cómo", "sino", "entonces", "aunque", "don", "doña","nomas","si","pa","jajajaja","jjaja",
-                                              "alla", "creo", "cada", "alla", "le", "el", "la", "en","weon","wea","q","jajaja","ajaja",
-                                              "igual", "pasa", "pasan", "hace","manda","cacha", "multimedia","wn","po","cn","pal","ta","ajajajja", "ajajajjaja", "seee", "ajajajajja", "wajajajajajjaja", "wajajaja", "10", "1", "pq", "jajajajajajaja", "k",
-                                              "toda", "ahora", "tema", "omitido", "que","Porqué","siempre","https","toy","mas","2","3",
-                                              "hacen", "hacer","ajajajajaja", "jajajajajaja", "jajajajaja", "jajajajaja"))
+# 3) Reemplazar stopwords por espacio en el texto original
+chat$text2 <- stringi::stri_replace_all_regex(
+  chat$Gastos_casa.obs,
+  pattern    = base::paste0(" ", to_remove, " "),
+  replacement= base::rep(" ", base::length(to_remove)),
+  vectorize  = FALSE
+)
 
-library(stringi)
+# 4) Versión "limpia" tokenizada (si la quieres conservar)
+chat_clean <- chat |>
+  tidytext::unnest_tokens(output = word, input = text2) |>
+  dplyr::anti_join(tidytext::stop_words, by = "word") |>
+  dplyr::filter(!base::is.na(word)) |>
+  dplyr::filter(!word %in% to_remove)
 
-chat$text2 <- stri_replace_all_regex(chat$Gastos_casa.obs,
-                                  pattern=paste0(" ",to_remove," "),
-                                  replacement=rep(" ",length(to_remove)),
-                                  vectorize=FALSE)
+# 5) Conteo top 20 palabras (gráfico)
+chat |>
+  tidytext::unnest_tokens(output = word, input = text2) |>
+  dplyr::filter(!word %in% to_remove) |>
+  dplyr::count(word, sort = TRUE) |>
+  dplyr::slice_max(order_by = n, n = 20, with_ties = FALSE) |>
+  dplyr::filter(!base::is.na(word)) |>
+  ggplot2::ggplot(ggplot2::aes(x = stats::reorder(word, n), y = n)) +
+  ggplot2::geom_col(show.legend = FALSE) +
+  ggplot2::ylab("") +
+  ggplot2::xlab("") +
+  ggplot2::coord_flip() +
+  tidytext::scale_x_reordered() +
+  ggplot2::ggtitle("Figura. Gastos detallados más usados")
 
-chat_clean <- chat %>%
-  tidytext::unnest_tokens(word, text2) %>%
-  anti_join(stop_words)
-
-
-chat_clean <- chat_clean %>%
-  na.omit(chat_clean)
-
-chat_clean <- chat_clean %>%
-  filter(!word %in% to_remove)
-
-chat %>%
-    tidytext::unnest_tokens(input = text2,
-                  output = word) %>%
-    filter(!word %in% to_remove)%>%
-    count(word, sort = TRUE) %>%
-    #group_by(author) %>%
-    top_n(n = 20, n) %>%
-    dplyr::filter(!is.na(word)) %>% 
-    ggplot(aes(x = stats::reorder(word, n), y = n)) +
-    geom_col(show.legend = FALSE) +
-    ylab("") +
-    xlab("") +
-    coord_flip() +
-#    facet_wrap(~author, ncol = 2, scales = "free_y") +
-    scale_x_reordered() +
-    ggtitle("Figura. Gastos detallados más usados")
 ```
 
 <br>
@@ -964,7 +967,7 @@ chat %>%
 
 Saqué la UF proyectada 
 
-```{r 1, echo=T, paged.print=TRUE,eval=T}
+```{r ufs, echo=T, paged.print=TRUE,eval=T}
 #options(max.print=5000)
 
 uf18 <-rvest::read_html("https://www.sii.cl/valores_y_fechas/uf/uf2018.htm")%>% rvest::html_nodes("table")
@@ -991,17 +994,11 @@ tryCatch(uf25 <-uf25[[length(uf25)]] %>% rvest::html_table() %>% data.frame() %>
 uf_serie<-
 bind_rows(
 cbind.data.frame(anio= 2018, uf18[[length(uf18)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
-
 cbind.data.frame(anio= 2019, uf19[[length(uf19)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
-
 cbind.data.frame(anio= 2020, uf20[[length(uf20)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
-
 cbind.data.frame(anio= 2021, uf21[[length(uf21)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
-
 cbind.data.frame(anio= 2022, uf22[[length(uf22)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
-
 cbind.data.frame(anio= 2023, uf23[[length(uf23)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
-
 cbind.data.frame(anio= 2024, uf23[[length(uf24)]] %>% rvest::html_table() %>% data.frame() %>% reshape2::melt(id.vars=1)),
 cbind.data.frame(anio= 2025, uf25)
 )
@@ -1016,11 +1013,9 @@ dplyr::mutate(month=plyr::revalue(tolower(.[[3]]),c("ene" = 1, "feb"=2, "mar"=3,
 #Abbreviated month name in the current locale on this platform. (Also matches full name on input: in some locales there are no abbreviations of names.)
 
 warning(paste0("number of observations:",nrow(uf_serie_corrected),",  min uf: ",min(uf_serie_corrected$value),",  min date: ",min(uf_serie_corrected $date3 )))
-
 # 
 # uf_proyectado <- readxl::read_excel("uf_proyectado.xlsx") %>% dplyr::arrange(Período) %>% 
 #   dplyr::mutate(Período= as.Date(lubridate::parse_date_time(Período, c("%Y-%m-%d"),exact=T)))
-
 ts_uf_proy<-
 ts(data = uf_serie_corrected$value, 
    start = as.numeric(as.Date("2018-01-01")), 
@@ -1028,16 +1023,22 @@ ts(data = uf_serie_corrected$value,
    deltat = 1, ts.eps = getOption("ts.eps"))
 
 fit_tbats <- forecast::tbats(ts_uf_proy)
-	
 
 fr_fit_tbats<-forecast::forecast(fit_tbats, h=298)
-
 ```
 
 ```{r 1-NIXTLA, echo=T, paged.print=TRUE,eval=T, error=T, fig.align='center', fig.pos='H', caption="Figura. Proyección de UF , Modelo TimeGPT"}
 # Configurar API Key
+if(nchar(Sys.getenv("API_NIXTLA"))<2){
+  Sys.setenv("API_NIXTLA"=as.character(read.table(paste0(dirname(getwd()),"/nixtlar_api_key.txt"), quote="\"", comment.char="")))
+}
+if(nchar(Sys.getenv("API_NIXTLA"))<2){
+  try(Sys.setenv("API_NIXTLA"=as.character(read.table(paste0(gsub("/gastos","",dirname(rstudioapi::getActiveDocumentContext()$path)),"/nixtlar_api_key.txt"), quote="\"", comment.char=""))))
+}
+
 nixtlar::nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
 try(nixtlar::nixtla_set_api_key(Sys.getenv("NIXTLA")))
+
 
 # Preparar datos en formato requerido por TimeGPT
 uf_timegpt <- uf_serie_corrected %>%
@@ -1051,11 +1052,12 @@ timegpt_fcst <- nixtlar::nixtla_client_forecast(
   uf_timegpt,
   h = 298,               # 298 días a pronosticar
   freq = "D",            # Frecuencia diaria
-  add_history = TRUE,     # Incluir datos históricos en el output
+  add_history = FALSE,     # Incluir datos históricos en el output
   level = c(80,95),
   model=  "timegpt-1-long-horizon", 
   clean_ex_first = TRUE
 )
+# The Conflict: The API endpoint for the long-horizon model likely does not support generating "fitted values" for the historical input data, causing the server to return "Unprocessable Entity" (422).
 
 # 1. Convertir 'ds' a fecha en ambas tablas
 uf_timegpt <- uf_timegpt %>% 
@@ -1171,6 +1173,55 @@ ggplot(forecast, aes(x = ds, y = yhat)) +
     panel.border = element_blank(),
     plot.caption = element_text(color = "gray30")
   )
+
+
+
+# 1. Ensure dates are strictly Date objects
+history_df <- uf_timegpt %>% mutate(ds = as.Date(ds))
+fcst_df    <- timegpt_fcst %>% mutate(ds = as.Date(ds))
+
+# 2. Plotting (Notice we don't bind_rows, we layer them)
+ggplot() +
+    # --- FORECAST LAYERS ---
+    # 95% Confidence Interval
+    geom_ribbon(data = fcst_df, 
+                aes(x = ds, ymin = `TimeGPT-lo-95`, ymax = `TimeGPT-hi-95`), 
+                fill = "#4B9CD3", alpha = 0.2) +
+    # 80% Confidence Interval
+    geom_ribbon(data = fcst_df, 
+                aes(x = ds, ymin = `TimeGPT-lo-80`, ymax = `TimeGPT-hi-80`), 
+                fill = "#4B9CD3", alpha = 0.3) +
+    # Forecast Line (Map y to the 'TimeGPT' column)
+    geom_line(data = fcst_df, 
+              aes(x = ds, y = TimeGPT, color = "Pronóstico"), size = 1) +
+
+    # --- HISTORY LAYER ---
+    # History Line (Map y to the 'y' column)
+    geom_line(data = history_df, 
+              aes(x = ds, y = y, color = "Histórico"), size = 1) +
+
+    # --- STYLING ---
+    geom_vline(xintercept = max(history_df$ds), 
+               linetype = "dashed", color = "red", size = 0.8) +
+    scale_x_date(date_breaks = "3 months", date_labels = "%b %Y") +
+    scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) +
+    scale_color_manual(name = "Leyenda", 
+                       values = c("Histórico" = "black", "Pronóstico" = "#4B9CD3")) +
+    labs(
+        title = "Pronóstico de Serie Temporal con TimeGPT",
+        subtitle = "Modelo: timegpt-1-long-horizon",
+        x = "Fecha", y = "Valor"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      plot.subtitle = element_text(color = "gray50"),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      plot.caption = element_text(color = "gray30")
+    )+
+      theme(legend.position = "bottom")
 ```
 
 
@@ -1244,17 +1295,19 @@ dplyr::right_join(dplyr::group_by(reshape2::melt(data.frame(fr_fit_tbats_uf)),va
 Lo haré en base a 2 cálculos: el gasto semanal y el gasto mensual en base a mis gastos desde marzo de 2019. La primera proyección la hice añadiendo el precio del arriendo mensual y partiendo en 2 (porque es con yo y Tami). No se incluye el último mes.
 
 
-```{r 2, echo=T, paged.print=TRUE,eval=T , echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE, caption="Figura. Proyección de gastos (incluyendo arriendo), Modelo TBATS"}
+```{r 2-gastos-proyectados-mensuales, echo=T, paged.print=TRUE,eval=T , echo=T, fig.align='center', fig.pos='H',cache=T, eval=T,message=FALSE, warning=FALSE, caption="Figura. Proyección de gastos (incluyendo arriendo), Modelo TBATS"}
 Gastos_casa_nvo <- readr::read_csv(as.character(path_sec),
                                col_names = c("Tiempo", "gasto", "fecha", "obs", "monto", "gastador",
                                              "link"),skip=1) %>% 
               dplyr::mutate(fecha= lubridate::parse_date_time(fecha, c("%d/%m/%Y"),exact=T)) %>% 
               dplyr::mutate(fecha_month=strftime(fecha, format = "%Y-%m")) %>%
               dplyr::mutate(day=as.Date(as.character(lubridate::floor_date(fecha, "day"))))
+
 Gastos_casa_m <-
 Gastos_casa_nvo %>% dplyr::group_by(fecha_month)%>%
               dplyr::summarise(gasto_total=(sum(monto)+500000)/1000,fecha=first(fecha))%>%
               data.frame()
+  
 
 uf_serie_corrected_m <-
 uf_serie_corrected %>% dplyr::mutate(ano_m=paste0(anio,"-",sprintf("%02d",as.numeric(month)))) %>%  dplyr::group_by(ano_m)%>%
@@ -1285,7 +1338,7 @@ autplo2t<-
   autoplotly::autoplotly(forecast::forecast(fit_tbats_m, h=12), ts.colour = "darkred",
            predict.colour = "blue", predict.linetype = "dashed")%>% 
   plotly::layout(showlegend = F, 
-          yaxis = list(title = "Gastos (en miles)"),
+          yaxis = list(title = "Gastos (en miles)+ Arriendo"),
          xaxis = list(
     title="Fecha",
       ticktext = as.list(seq_dates[seq(from = 1, to = (dim(Gastos_casa_m)[1]+12), by = 3)]), 
@@ -1389,7 +1442,7 @@ Gastos_casa_mensual_2022 %>%
 ) %>% ggplotly()
 ```
 
-```{r predictor-gastador-gastos-manual-timegpt, eval=T, echo=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual, predicho"}
+```{r predictor-gastador-gastos-manual-timegpt, eval=T, echo=T, error=T, fig.height=8, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Gasto Mensual, predicho"}
 Gastos_casa_mensual_2022$mes_ano <- gsub("marzo", "Mar", Gastos_casa_mensual_2022$mes_ano)
 Gastos_casa_mensual_2022$mes_ano <- gsub("abril", "Apr", Gastos_casa_mensual_2022$mes_ano)
 Gastos_casa_mensual_2022$mes_ano <- gsub("mayo", "May", Gastos_casa_mensual_2022$mes_ano)
@@ -1439,7 +1492,7 @@ gastos_timegpt_fcst <- nixtlar::nixtla_client_forecast(
   Gastos_casa_mensual_2022_timegpt_ex,
   h = 12,
   freq = "M",  # Monthly frequency
-  add_history = TRUE,
+  add_history = F,
   level = c(80, 95),
   model = "timegpt-1",#"timegpt-1-long-horizon",
   clean_ex_first = TRUE
@@ -1459,12 +1512,12 @@ full_data_gastos <- bind_rows(
 )
 
 full_data_gastos |> 
-  dplyr::mutate(y= ifelse(is.na(y),TimeGPT, y)) |> 
+  dplyr::mutate(y= ifelse(is.na(y),TimeGPT/1000, y/1000)) |> 
 # Visualize results
 ggplot(aes(x = ds, y = y)) +
-  geom_ribbon(aes(ymin = `TimeGPT-lo-95`, ymax = `TimeGPT-hi-95`),
+  geom_ribbon(aes(ymin = `TimeGPT-lo-95`/1000, ymax = `TimeGPT-hi-95`/1000),
               fill = "#4B9CD3", alpha = 0.2) +
-  geom_ribbon(aes(ymin = `TimeGPT-lo-80`, ymax = `TimeGPT-hi-80`),
+  geom_ribbon(aes(ymin = `TimeGPT-lo-80`/1000, ymax = `TimeGPT-hi-80`/1000),
               fill = "#4B9CD3", alpha = 0.3) +
   geom_line(aes(color = type), linewidth = 1.5) +
   geom_vline(xintercept = max(filter(full_data_gastos, type == "Histórico")$ds),
@@ -1475,9 +1528,9 @@ ggplot(aes(x = ds, y = y)) +
   ) +
   scale_y_continuous(
     name = "Gastos Totales",
-    labels = scales::comma,
-    breaks = pretty(full_data_gastos$y, n = 10),
-    expand = expansion(mult = c(0.05, 0.05))
+    labels = scales::comma#,
+    # breaks = pretty(full_data_gastos$y, n = 10),
+    # expand = expansion(mult = c(0.05, 0.05))
   ) +
   scale_color_manual(
     name = "Leyenda",
