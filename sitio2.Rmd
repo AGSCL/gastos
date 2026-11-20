@@ -259,7 +259,7 @@ reglas_categoria <- c(
   "Diosi"                             = "diosi",
   "Entretención"                      = "nintendo|playstation|steam|videojuego",
   "Transporte"                        = "uber|cabify|transporte|bencina|\\btag\\b|peaje|autopista|estacionamiento|viaje|assistcard",
-  "Electrodomesticos/mantencion casa" = "electrodomestic|mantencion|aspiradora|microondas|mueble|mouse|reloj|cortina|filtro|toyotomi|alfombra|sopapo|\\bpila|jardiner|camara|\\btina\\b|nacho|lamina|chromecast|\\beasy\\b|sodimac|arreglo|gasfiter",
+  "Electrodomesticos/mantencion casa" = "electrodomestic|mantencion|aspiradora|microondas|mueble|mouse|reloj|cortina|filtro|toyotomi|alfombra|sopapo|\\bpila|jardiner|camara|\\btina\\b|nacho|lamina|chromecast|\\beasy\\b|sodimac|arreglo|gasfiter|lavadora|secadora|malla|chapa|cerrajer|biblioteca",
   "Farmacia"                          = "farmacia|remedio|\\byaz\\b|nexium|vacuna|gaviscon|paracetamol|cruz verde|salcobrand",
   "Streaming/Telefonia"               = "vtr|netflix|crunchyroll|entel|internet|spotify|disney|celular|telefon",
   "Servicios básicos"                 = "electricidad|\\bluz\\b|\\benel\\b|\\bgas\\b|parafina|kerosen|agua",
@@ -348,6 +348,20 @@ gasto_mes_cat %>%
   theme_custom()
 ```
 
+::: controlly
+```{r control-anual, warning=F, message=F}
+gasto_mes_cat %>%
+  dplyr::filter(mes < mes_actual) %>%
+  dplyr::group_by(categoria, anio = format(mes, "%Y")) %>%
+  dplyr::summarise(gasto = mean(gasto) / 1000, .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = anio, values_from = gasto) %>%
+  janitor::adorn_totals() %>%
+  dplyr::rename(`Categoría` = categoria) %>%
+  knitr::kable("markdown", digits = 0,
+               caption = "Gasto promedio mensual por categoría y año, en miles de pesos (los meses sin gasto cuentan como cero)")
+```
+:::
+
 ## Gastos sin clasificar
 
 Ítems que no calzan con ninguna regla y quedan en "Otros". Si alguno pesa, se agrega su palabra a `reglas_categoria`.
@@ -356,10 +370,10 @@ gasto_mes_cat %>%
 ```{r control-otros, warning=F, message=F}
 Gastos_casa %>%
   dplyr::filter(categoria == "Otros") %>%
-  dplyr::group_by(gasto) %>%
-  dplyr::summarise(veces = dplyr::n(), total = sum(monto, na.rm = TRUE), ultima = max(fecha_d, na.rm = TRUE)) %>%
+  dplyr::group_by(gasto, obs) %>%
+  dplyr::summarise(veces = dplyr::n(), total = sum(monto, na.rm = TRUE), ultima = max(fecha_d, na.rm = TRUE), .groups = "drop") %>%
   dplyr::arrange(dplyr::desc(total)) %>%
-  knitr::kable("markdown", col.names = c("Ítem", "Veces", "Total", "Última fecha"),
+  knitr::kable("markdown", col.names = c("Ítem", "Observación", "Veces", "Total", "Última fecha"),
                format.args = list(big.mark = ".", decimal.mark = ","))
 ```
 :::
@@ -786,68 +800,6 @@ wordcloud::wordcloud(
 
 ```
 
-::: controlly
-```{r month-gasto-recategorizar, echo=T,fig.align='center', fig.pos='H', eval=T, message=FALSE, warning=F}
-
-fit_month_gasto <- Gastos_casa_gastador_cat_gasto %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(
-    # month string YYYY-MM
-    fecha_month = base::format(fecha, "%Y-%m")
-  ) %>%
-  dplyr::mutate(
-    # order months from 2019-03 until today (like in your original code)
-    fecha_month = base::factor(
-      fecha_month,
-      levels = base::format(
-        base::seq(
-          from = base::as.Date("2019-03-03"),
-          to   = base::as.Date(base::substr(base::Sys.time(), 1, 10)),
-          by   = "1 month"
-        ),
-        "%Y-%m"
-      )
-    )
-  ) %>%
-  dplyr::group_by(fecha_month, categoria, .drop = FALSE) %>%
-  dplyr::summarise(
-    gasto_total = base::sum(monto, na.rm = TRUE) / 1000,
-    .groups = "drop"
-  ) %>%
-  base::as.data.frame()
-
-#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:
-#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:
-#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:#:
-current_ym <- base::format(base::Sys.Date(), "%Y-%m")
-
-tabla_gasto_year_item <-
-    fit_month_gasto %>%
-    dplyr::mutate(
-        year = base::substr(base::as.character(fecha_month), 1, 4),
-        ym   = base::as.character(fecha_month)
-    ) %>%
-    # opcional: excluir el mes actual (incompleto)
-    dplyr::filter(ym != current_ym) %>%
-    # si quieres solo ciertos años:
-    # dplyr::filter(year %in% c("2020","2021","2022","2023","2024","2025")) %>%
-    dplyr::group_by(categoria, year) %>%
-    dplyr::summarise(
-        gasto_prom = base::mean(gasto_total, na.rm = TRUE),
-        .groups    = "drop"
-    ) %>%
-    tidyr::pivot_wider(
-        names_from  = year,
-        values_from = gasto_prom
-    ) %>%
-    janitor::adorn_totals()  # agrega fila "Total"
-
-tabla_gasto_year_item |> 
-  knitr::kable("markdown",
-    caption = "Gasto Promedio Mensual por Ítem y Año (suma por categoría y mes)",
-    digits  = 1)
-```
-:::
  
 
 ```{r month-gasto-recategorizar2, echo=FALSE}
