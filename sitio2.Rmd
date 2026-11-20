@@ -380,85 +380,244 @@ Gastos_casa %>%
 
 <br>
 
-# 2. Presupuesto proyectado
+# 2. UF proyectada
 
-Se proyecta el gasto total mensual a 12 meses. Compiten cuatro modelos y se usa el que menos se equivocó prediciendo meses que ya pasaron (validación cruzada con origen móvil). El mes en curso queda fuera del ajuste porque está incompleto.
+UF promedio mensual según el SII. Sirve para descontar la inflación del gasto y para reajustar la proyección.
 
-```{r presupuesto-serie, warning=F, message=F}
-# Arriendo fijo que no se registra en la planilla; ajustar si cambia
-arriendo_mensual <- 500000
+```{r ufs, error=TRUE, warning=F, message=F}
+lee_uf <- function(anio) {
+  tablas <- rvest::read_html(paste0("https://www.sii.cl/valores_y_fechas/uf/uf", anio, ".htm")) %>%
+    rvest::html_nodes("table")
+  tablas[[length(tablas)]] %>%
+    rvest::html_table() %>%
+    data.frame() %>%
+    dplyr::mutate(dplyr::across(dplyr::everything(), as.character)) %>%
+    reshape2::melt(id.vars = 1) %>%
+    stats::setNames(c("dia", "mes", "valor")) %>%
+    dplyr::mutate(anio = anio)
+}
 
-gasto_mensual <- gasto_mes_cat %>%
-  dplyr::filter(mes < mes_actual) %>%
-  dplyr::group_by(mes) %>%
-  dplyr::summarise(gasto = sum(gasto) / 1000)
+meses_uf <- c(ene = 1, feb = 2, mar = 3, abr = 4, may = 5, jun = 6, jul = 7, ago = 8, sep = 9, oct = 10, nov = 11, dic = 12)
 
-y_mensual <- ts(gasto_mensual$gasto, frequency = 12,
-                start = c(lubridate::year(min(gasto_mensual$mes)), lubridate::month(min(gasto_mensual$mes))))
+uf_serie <- purrr::map_dfr(2018:lubridate::year(Sys.Date()), lee_uf) %>%
+  dplyr::transmute(
+    fecha = lubridate::make_date(anio, meses_uf[tolower(mes)], as.integer(dia)),
+    uf    = readr::parse_number(valor, locale = readr::locale(decimal_mark = ",", grouping_mark = "."))
+  ) %>%
+  dplyr::filter(!is.na(fecha), !is.na(uf)) %>%
+  dplyr::arrange(fecha)
+
+# Si falta un día, la serie queda corrida y la proyección sale mal sin avisar
+stopifnot(nrow(uf_serie) > 0, all(diff(uf_serie$fecha) == 1))
+
+uf_mensual <- uf_serie %>%
+  dplyr::group_by(mes = lubridate::floor_date(fecha, "month")) %>%
+  dplyr::summarise(uf = mean(uf), dias = dplyr::n()) %>%
+  dplyr::filter(dias == lubridate::days_in_month(mes))   # fuera el mes que el SII aún no publica completo
+
+y_uf <- ts(uf_mensual$uf, frequency = 12, start = c(2018, 1))
 ```
 
-```{r presupuesto-modelo, cache=TRUE, cache.extra=rlang::hash(y_mensual), warning=F, message=F}
-# Con caché: solo se recalcula cuando cambia la serie de meses completos, es decir, una vez al mes
+## Cómo se elige el modelo
+
+Cada modelo se prueba hacia atrás: se le esconden los meses más recientes, proyecta 12 meses y se mide cuánto erró contra lo que realmente pasó. Se hace de tres formas y gana el menor error promedio:
+
+- **Ventana expansiva**: se ajusta con toda la historia hasta un mes dado, y ese mes se va corriendo.
+- **Ventana móvil**: igual, pero usando solo los 36 meses previos, por si el pasado lejano ya no se parece al presente.
+- **Últimos 12 meses**: un solo corte, se ajusta sin el último año y se compara contra él.
+
+La **Combinación** es el promedio de los pronósticos de los demás modelos, sin contar el naive.
+
+```{r modelos, warning=F, message=F}
 modelos <- list(
   ETS                = function(y, h) forecast::forecast(forecast::ets(y), h = h),
   ARIMA              = function(y, h) forecast::forecast(forecast::auto.arima(y), h = h),
   Theta              = function(y, h) forecast::thetaf(y, h = h),
+  TBATS              = function(y, h) forecast::forecast(forecast::tbats(y, use.parallel = FALSE), h = h),
   `Naive estacional` = function(y, h) forecast::snaive(y, h = h)
 )
 
-# Cada modelo se ajusta con los datos hasta un mes dado y se mide cuánto erró en los 12 siguientes
-errores_cv <- lapply(modelos, function(f) forecast::tsCV(y_mensual, f, h = 12, initial = 36))
+# Errores (real - pronóstico) de un modelo: una columna por origen, una fila por mes de horizonte
+errores_hacia_atras <- function(y, f, h, origenes, ventana = NULL) {
+  sapply(origenes, function(i) {
+    desde <- if (is.null(ventana)) 1 else i - ventana + 1
+    entrena <- ts(y[desde:i], start = time(y)[desde], frequency = frequency(y))
+    y[i + seq_len(h)] - tryCatch(as.numeric(f(entrena, h)$mean), error = function(e) rep(NA_real_, h))
+  })
+}
 
-tabla_cv <- tibble::tibble(
-  Modelo = names(modelos),
-  MAE    = sapply(errores_cv, function(e) mean(abs(e), na.rm = TRUE)),
-  RMSE   = sapply(errores_cv, function(e) sqrt(mean(e^2, na.rm = TRUE)))
-) %>%
-  dplyr::arrange(MAE)
+compite <- function(y, modelos, h = 12, inicial = 36) {
+  n <- length(y)
+  # shortcut: orígenes cada 3 meses para que el recálculo tome cerca de un minuto; usar by = 1 si se quiere más precisión
+  origenes <- seq(inicial, n - 1, by = 3)
+  errores <- list(
+    `Ventana expansiva` = lapply(modelos, function(f) errores_hacia_atras(y, f, h, origenes)),
+    `Ventana móvil`     = lapply(modelos, function(f) errores_hacia_atras(y, f, h, origenes, ventana = inicial)),
+    `Últimos 12 meses`  = lapply(modelos, function(f) errores_hacia_atras(y, f, h, n - h))
+  )
+  # Promediar pronósticos equivale a promediar errores, así que la combinación no requiere reajustar nada
+  combinables <- setdiff(names(modelos), "Naive estacional")
+  errores <- lapply(errores, function(e) c(e, list(`Combinación` = Reduce(`+`, e[combinables]) / length(combinables))))
 
-mejor_modelo <- tabla_cv$Modelo[1]
-proyeccion   <- modelos[[mejor_modelo]](y_mensual, 12)
+  tabla <- tibble::tibble(Modelo = names(errores[[1]]))
+  for (forma in names(errores)) tabla[[forma]] <- sapply(errores[[forma]], function(e) mean(abs(e), na.rm = TRUE))
+  tabla$Promedio <- rowMeans(tabla[-1])
+  tabla <- dplyr::arrange(tabla, Promedio)
+
+  mejor <- tabla$Modelo[1]
+  ajustes <- lapply(modelos[if (mejor == "Combinación") combinables else mejor], function(f) f(y, h))
+  # shortcut: los intervalos de la combinación son el promedio de los de cada modelo; calibrarlos con los errores de validación si se usan para decidir
+  promedia <- function(campo) Reduce(`+`, lapply(ajustes, function(a) as.matrix(a[[campo]]))) / length(ajustes)
+
+  list(
+    tabla = tabla, mejor = mejor,
+    media = as.numeric(promedia("mean")),
+    inferior = matrix(as.numeric(promedia("lower")), ncol = 2), superior = matrix(as.numeric(promedia("upper")), ncol = 2),   # columnas: 80% y 95%
+    ultimo_anio = sapply(errores[["Últimos 12 meses"]], function(e) y[n - h + seq_len(h)] - as.numeric(e))
+  )
+}
+
+grafico_proyeccion <- function(historia, proyeccion, titulo, eje_y) {
+  ggplot(proyeccion, aes(x = mes)) +
+    geom_ribbon(aes(ymin = inf95, ymax = sup95), fill = "#4B9CD3", alpha = 0.2) +
+    geom_ribbon(aes(ymin = inf80, ymax = sup80), fill = "#4B9CD3", alpha = 0.3) +
+    geom_line(aes(y = valor), color = "#4B9CD3", linewidth = 1) +
+    geom_line(data = historia, aes(y = valor)) +
+    labs(x = "Mes", y = eje_y, title = titulo, subtitle = "Bandas: intervalos de predicción al 80% y 95%") +
+    theme_custom()
+}
 ```
 
-```{r presupuesto-cv}
-knitr::kable(tabla_cv, "markdown", digits = 0,
-             caption = "Error de cada modelo al predecir de 1 a 12 meses hacia adelante (miles de pesos; gana el menor MAE)")
+```{r ufs-modelo, cache=TRUE, cache.extra=rlang::hash(list(uf_mensual$uf, deparse(compite), deparse(modelos))), error=TRUE, warning=F, message=F}
+# Con caché: solo se recalcula cuando el SII publica un mes nuevo o cambia el código de la validación
+cv_uf <- compite(y_uf, modelos[c("ETS", "ARIMA", "Theta")])
 ```
 
-```{r presupuesto-grafico, fig.height=4, fig.width=9, fig.align="center", warning=F, message=F}
-ggplot2::autoplot(proyeccion) +
-  labs(x = "Año", y = "Gasto mensual (en miles)",
-       title = paste0("Gasto mensual proyectado a 12 meses (", mejor_modelo, ")"),
-       subtitle = "Bandas: intervalos de predicción al 80% y 95%") +
+```{r ufs-cv, error=TRUE}
+knitr::kable(cv_uf$tabla, "markdown", digits = 0,
+             caption = "UF: error absoluto medio al proyectar de 1 a 12 meses, en pesos")
+```
+
+```{r ufs-grafico, error=TRUE, fig.height=4, fig.width=9, fig.align="center", warning=F, message=F}
+# UF observada seguida de la proyectada: es la que usa el presupuesto
+uf_meses <- tibble::tibble(
+  mes = seq(min(uf_mensual$mes), by = "month", length.out = nrow(uf_mensual) + 12),
+  uf  = c(uf_mensual$uf, cv_uf$media)
+)
+
+proy_uf <- tibble::tibble(
+  mes = tail(uf_meses$mes, 12), valor = cv_uf$media,
+  inf80 = cv_uf$inferior[, 1], sup80 = cv_uf$superior[, 1], inf95 = cv_uf$inferior[, 2], sup95 = cv_uf$superior[, 2]
+)
+
+grafico_proyeccion(dplyr::rename(uf_mensual, valor = uf), proy_uf,
+                   paste0("UF proyectada a 12 meses (", cv_uf$mejor, ")"), "UF promedio mensual (pesos)") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ","))
+```
+
+::: controlly
+```{r ufs-tabla, error=TRUE}
+proy_uf %>%
+  dplyr::transmute(Mes = format(mes, "%m/%Y"), `UF proyectada` = valor, `Mínimo 95%` = inf95, `Máximo 95%` = sup95) %>%
+  knitr::kable("markdown", digits = 0, format.args = list(big.mark = ".", decimal.mark = ","),
+               caption = "UF promedio mensual proyectada (pesos)")
+```
+:::
+
+<br>
+
+# 3. Presupuesto proyectado
+
+El gasto de cada mes se convierte a UF para descontar la inflación, se proyecta en UF y se vuelve a pesos con la UF proyectada: así la proyección ya incluye el alza esperada de precios. El mes en curso queda fuera del ajuste porque está incompleto.
+
+```{r presupuesto-serie, error=TRUE, warning=F, message=F}
+# Arriendo que no se registra en la planilla; en la proyección se reajusta según la UF
+arriendo_mensual <- 860000
+
+gasto_mensual <- gasto_mes_cat %>%
+  dplyr::filter(mes < mes_actual) %>%
+  dplyr::group_by(mes) %>%
+  dplyr::summarise(gasto = sum(gasto)) %>%
+  dplyr::left_join(uf_meses, by = "mes") %>%
+  dplyr::mutate(gasto_uf = gasto / uf)
+
+y_gasto <- ts(gasto_mensual$gasto_uf, frequency = 12,
+              start = c(lubridate::year(min(gasto_mensual$mes)), lubridate::month(min(gasto_mensual$mes))))
+```
+
+```{r presupuesto-modelo, cache=TRUE, cache.extra=rlang::hash(list(y_gasto, deparse(compite), deparse(modelos))), error=TRUE, warning=F, message=F}
+# Con caché: solo se recalcula cuando cambia la serie de meses completos, es decir, una vez al mes
+cv_gasto    <- compite(y_gasto, modelos)
+tbats_gasto <- forecast::tbats(y_gasto, use.box.cox = FALSE, use.parallel = FALSE)   # sin Box-Cox para que los componentes queden en UF
+```
+
+```{r presupuesto-cv, error=TRUE}
+uf_hoy <- tail(uf_mensual$uf, 1)
+
+cv_gasto$tabla %>%
+  dplyr::mutate(dplyr::across(-Modelo, ~ .x * uf_hoy / 1000)) %>%
+  knitr::kable("markdown", digits = 0,
+               caption = "Gasto: error absoluto medio al proyectar de 1 a 12 meses, en miles de pesos de hoy (gana el menor promedio)")
+```
+
+```{r presupuesto-ultimo-anio, error=TRUE, fig.height=4, fig.width=9, fig.align="center", warning=F, message=F}
+# Lo que cada modelo habría proyectado para el último año sin haberlo visto, contra lo que pasó
+ultimo_anio <- tail(gasto_mensual, 12)
+
+tibble::as_tibble(cv_gasto$ultimo_anio * ultimo_anio$uf / 1000) %>%
+  dplyr::mutate(mes = ultimo_anio$mes) %>%
+  tidyr::pivot_longer(-mes, names_to = "Modelo", values_to = "gasto") %>%
+  ggplot(aes(x = mes, y = gasto)) +
+  geom_line(aes(color = Modelo), linewidth = 0.8) +
+  geom_line(data = ultimo_anio, aes(y = gasto / 1000), linewidth = 1.2) +
+  scale_color_brewer(palette = "Dark2") +
+  scale_x_date(date_breaks = "2 months", date_labels = "%m/%y") +
+  labs(x = "Mes", y = "Gasto mensual (en miles)", title = "Prueba hacia atrás: último año",
+       subtitle = "Línea negra gruesa: gasto real. Colores: lo que proyectaba cada modelo 12 meses antes") +
   theme_custom()
 ```
 
-```{r presupuesto-tabla, results="asis"}
-# En lower/upper la columna 1 es el intervalo al 80% y la 2 al 95%
+```{r presupuesto-grafico, error=TRUE, fig.height=4, fig.width=9, fig.align="center", warning=F, message=F}
+# shortcut: los intervalos solo reflejan la incertidumbre del gasto, no la de la UF, que es mucho menor
+proy_gasto <- tibble::tibble(mes = seq(mes_actual, by = "month", length.out = 12)) %>%
+  dplyr::left_join(uf_meses, by = "mes") %>%
+  dplyr::mutate(
+    gasto_uf = cv_gasto$media,
+    valor    = gasto_uf * uf / 1000,
+    inf80    = pmax(0, cv_gasto$inferior[, 1]) * uf / 1000, sup80 = cv_gasto$superior[, 1] * uf / 1000,
+    inf95    = pmax(0, cv_gasto$inferior[, 2]) * uf / 1000, sup95 = cv_gasto$superior[, 2] * uf / 1000,
+    arriendo = arriendo_mensual * uf / uf[1] / 1000
+  )
+
+grafico_proyeccion(dplyr::transmute(gasto_mensual, mes, valor = gasto / 1000), proy_gasto,
+                   paste0("Gasto mensual proyectado a 12 meses (", cv_gasto$mejor, ", reajustado por UF)"),
+                   "Gasto mensual (en miles)")
+```
+
+```{r presupuesto-tabla, error=TRUE, results="asis"}
 gastado_mes <- sum(gasto_mes_cat$gasto[gasto_mes_cat$mes == mes_actual]) / 1000
 miles <- function(x) format(round(x), big.mark = ".", decimal.mark = ",")
 
 cat("En ", format(mes_actual, "%m/%Y"), " van gastados **", miles(gastado_mes), " mil** de un presupuesto proyectado de **",
-    miles(proyeccion$mean[1]), " mil** (", round(100 * gastado_mes / proyeccion$mean[1]), "%).\n\n", sep = "")
+    miles(proy_gasto$valor[1]), " mil** (", round(100 * gastado_mes / proy_gasto$valor[1]), "%).\n\n", sep = "")
 
-tibble::tibble(
-  Mes                     = format(seq(mes_actual, by = "month", length.out = 12), "%m/%Y"),
-  `Proyección`            = as.numeric(proyeccion$mean),
-  `Mínimo 80%`            = pmax(0, proyeccion$lower[, 1]),
-  `Máximo 80%`            = as.numeric(proyeccion$upper[, 1]),
-  `Máximo 95%`            = as.numeric(proyeccion$upper[, 2]),
-  `Proyección + arriendo` = as.numeric(proyeccion$mean) + arriendo_mensual / 1000
-) %>%
-  knitr::kable("markdown", digits = 0, caption = "Presupuesto proyectado por mes (miles de pesos)") %>%
+proy_gasto %>%
+  dplyr::transmute(
+    Mes = format(mes, "%m/%Y"), `UF` = uf, `Gasto en UF` = gasto_uf, `Proyección` = valor,
+    `Mínimo 80%` = inf80, `Máximo 80%` = sup80, `Máximo 95%` = sup95,
+    `Arriendo reajustado` = arriendo, `Proyección + arriendo` = valor + arriendo
+  ) %>%
+  knitr::kable("markdown", digits = c(0, 0, 1, 0, 0, 0, 0, 0, 0), format.args = list(big.mark = ".", decimal.mark = ","),
+               caption = "Presupuesto proyectado por mes, en miles de pesos (UF en pesos)") %>%
   print()
 ```
 
-```{r presupuesto-categorias}
+```{r presupuesto-categorias, error=TRUE}
 # shortcut: reparte el total según el peso de cada categoría en los últimos 12 meses; pasar a un modelo por categoría si sus tendencias divergen
 prom_12m %>%
   dplyr::mutate(
     `% del gasto`         = 100 * `Promedio 12 meses` / sum(`Promedio 12 meses`),
-    `Presupuesto mensual` = `% del gasto` / 100 * mean(proyeccion$mean)
+    `Presupuesto mensual` = `% del gasto` / 100 * mean(proy_gasto$valor)
   ) %>%
   dplyr::select(-`Promedio 12 meses`) %>%
   dplyr::arrange(dplyr::desc(`Presupuesto mensual`)) %>%
@@ -467,9 +626,29 @@ prom_12m %>%
   knitr::kable("markdown", digits = 0, caption = "Presupuesto mensual por categoría, promedio de los próximos 12 meses (miles de pesos)")
 ```
 
+## Tendencia del gasto
+
+Descomposición TBATS del gasto mensual en UF, es decir, descontada la inflación: el nivel muestra hacia dónde va el gasto real una vez quitado el ruido de cada mes.
+
+```{r presupuesto-tendencia, error=TRUE, fig.height=5, fig.width=9, fig.align="center", warning=F, message=F}
+nombres_tbats <- c(observed = "Observado", level = "Nivel", slope = "Pendiente", season = "Estacionalidad")
+componentes <- forecast::tbats.components(tbats_gasto)
+
+tibble::as_tibble(componentes) %>%
+  dplyr::mutate(mes = gasto_mensual$mes) %>%
+  tidyr::pivot_longer(-mes, names_to = "componente", values_to = "valor") %>%
+  dplyr::mutate(componente = dplyr::coalesce(unname(nombres_tbats[componente]), componente),
+                componente = factor(componente, levels = unique(componente))) %>%
+  ggplot(aes(x = mes, y = valor)) +
+  geom_line() +
+  facet_wrap(~ componente, ncol = 1, scales = "free_y") +
+  labs(x = "Mes", y = "UF", title = "Descomposición TBATS del gasto mensual (en UF)") +
+  theme_custom()
+```
+
 <br>
 
-# 3. Análisis históricos
+# 4. Análisis históricos
 
 ```{r fig-1, echo=FALSE, fig.height=4, fig.width=8, warning=FALSE, fig.align = "center", message=F, caption="Figura. Tipos de Gasto por Persona"}
 
@@ -866,67 +1045,6 @@ chat |>
   ggplot2::ggtitle("Figura. Gastos detallados más usados")
 
 ```
-
-<br>
-
-# 4. UF Proyectada
-
-UF promedio mensual según el SII, proyectada a 12 meses con un ARIMA automático.
-
-```{r ufs, error=TRUE, warning=F, message=F}
-lee_uf <- function(anio) {
-  tablas <- rvest::read_html(paste0("https://www.sii.cl/valores_y_fechas/uf/uf", anio, ".htm")) %>%
-    rvest::html_nodes("table")
-  tablas[[length(tablas)]] %>%
-    rvest::html_table() %>%
-    data.frame() %>%
-    dplyr::mutate(dplyr::across(dplyr::everything(), as.character)) %>%
-    reshape2::melt(id.vars = 1) %>%
-    stats::setNames(c("dia", "mes", "valor")) %>%
-    dplyr::mutate(anio = anio)
-}
-
-meses_uf <- c(ene = 1, feb = 2, mar = 3, abr = 4, may = 5, jun = 6, jul = 7, ago = 8, sep = 9, oct = 10, nov = 11, dic = 12)
-
-uf_serie <- purrr::map_dfr(2018:lubridate::year(Sys.Date()), lee_uf) %>%
-  dplyr::transmute(
-    fecha = lubridate::make_date(anio, meses_uf[tolower(mes)], as.integer(dia)),
-    uf    = readr::parse_number(valor, locale = readr::locale(decimal_mark = ",", grouping_mark = "."))
-  ) %>%
-  dplyr::filter(!is.na(fecha), !is.na(uf)) %>%
-  dplyr::arrange(fecha)
-
-# Si falta un día, la serie queda corrida y la proyección sale mal sin avisar
-stopifnot(nrow(uf_serie) > 0, all(diff(uf_serie$fecha) == 1))
-
-uf_mensual <- uf_serie %>%
-  dplyr::group_by(mes = lubridate::floor_date(fecha, "month")) %>%
-  dplyr::summarise(uf = mean(uf), dias = dplyr::n()) %>%
-  dplyr::filter(dias == lubridate::days_in_month(mes))   # fuera el mes que el SII aún no publica completo
-
-proy_uf <- forecast::forecast(forecast::auto.arima(ts(uf_mensual$uf, frequency = 12, start = c(2018, 1))), h = 12)
-```
-
-```{r ufs-grafico, error=TRUE, fig.height=4, fig.width=9, fig.align="center", warning=F, message=F}
-ggplot2::autoplot(proy_uf) +
-  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
-  labs(x = "Año", y = "UF promedio mensual (pesos)", title = "UF proyectada a 12 meses",
-       subtitle = paste0("Último dato del SII: ", max(uf_serie$fecha), ". Bandas: intervalos de predicción al 80% y 95%")) +
-  theme_custom()
-```
-
-::: controlly
-```{r ufs-tabla, error=TRUE}
-tibble::tibble(
-  Mes             = format(seq(max(uf_mensual$mes), by = "month", length.out = 13)[-1], "%m/%Y"),
-  `UF proyectada` = as.numeric(proy_uf$mean),
-  `Mínimo 95%`    = as.numeric(proy_uf$lower[, 2]),
-  `Máximo 95%`    = as.numeric(proy_uf$upper[, 2])
-) %>%
-  knitr::kable("markdown", digits = 0, format.args = list(big.mark = ".", decimal.mark = ","),
-               caption = "UF promedio mensual proyectada (pesos)")
-```
-:::
 
 <br>
 
