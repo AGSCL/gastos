@@ -11,15 +11,11 @@ jobs:
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: true
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       SUPERSECRET: ${{ secrets.SUPERSECRET }}
-      API_NIXTLA: ${{ secrets.API_NIXTLA }}
-      NIXTLA_API_KEY: ${{ secrets.API_NIXTLA }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          
+
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
         with:
@@ -30,15 +26,6 @@ jobs:
       - name: Setup .Renviron
         run: |
           echo "SUPERSECRET=$SUPERSECRET" >> ~/.Renviron
-          echo "API_NIXTLA=$API_NIXTLA" >> ~/.Renviron
-          echo "NIXTLA_API_KEY=$NIXTLA_API_KEY" >> ~/.Renviron
-      - name: Set TimeGPT API Key
-        run: echo "API_NIXTLA=${{ secrets.API_NIXTLA }}" >> $GITHUB_ENV
-      
-      - name: Test API Key
-        run: |
-          Rscript -e "print(Sys.getenv('API_NIXTLA'))"    
-
       - name: Set locale
         shell: bash
         if: always()
@@ -46,52 +33,38 @@ jobs:
           Rscript -e 'Sys.setlocale("LC_TIME", "Spanish_Chile.1252")'
           Rscript -e 'Sys.setlocale("LC_COLLATE", "Spanish_Chile.1252")'
 
-      - name: Cache R packages
+      # Instala solo lo que usa sitio2.Rmd y guarda los paquetes en caché entre corridas
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::rmarkdown
+            any::knitr
+            any::tidyverse
+            any::plyr
+            any::reshape2
+            any::scales
+            any::plotly
+            any::forecast
+            any::tsibble
+            any::ggiraph
+            any::gplots
+            any::Hmisc
+            any::tm
+            any::wordcloud
+            any::RColorBrewer
+            any::tidytext
+            any::rvest
+            any::janitor
+            any::DT
+            any::sessioninfo
+
+      # Caché de knitr: el modelo de presupuesto solo se recalcula cuando cambia la serie mensual
+      - name: Cache knitr
         uses: actions/cache@v4
         with:
-          path: ${{ env.R_LIBS_USER }}
-          key: ${{ runner.os }}-r-${{ hashFiles('DESCRIPTION') }}
-          restore-keys: ${{ runner.os }}-r-
-      
-      - name: Install dependencies
-        if: always()
-        run: |
-          Rscript -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/2024-04-15'))"
-          Rscript -e "install.packages(c('lintr', 'remotes', 'rsconnect', 'devtools', 'kableExtra', 'sjPlot', 'tsibble', 'zoo', 'reshape2', 'ggiraph', 'gplots', 'wordcloud', 'autoplotly', 'tidyverse', 'distill', 'plotly', 'knitr', 'survminer', 'reader', 'rowr', 'DataExplorer','SnowballC','readr','scales','CausalImpact', 'bsts','DT', 'withr', 'rmarkdown','plotrix','stringr','stringi','sparklyr','readxl','httr','fUnitRoots','tm','forecast','its.analysis', 'lubridate', 'tidytext', 'sjPlot', 'prophet', 'xts', 'nixtlar', 'rmarkdown'), repos = 'https://cloud.r-project.org')"
-          Rscript -e "devtools::install_github('terrytangyuan/autoplotly')"
-          Rscript -e "nixtlar::nixtla_set_api_key(Sys.getenv('API_NIXTLA'))"
-          Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA')))"
-          Rscript -e "try(nixtlar::nixtla_set_api_key(Sys.getenv('NIXTLA_API_KEY')))"
-          Rscript -e "try(nixtlar::nixtla_validate_api_key())"
-
-      - name: Nixtla Simulated Forecast Test
-        shell: bash
-        run: |
-          Rscript - <<'EOF'
-          library(nixtlar)
-
-          nixtla_set_api_key(Sys.getenv("API_NIXTLA"))
-
-          set.seed(2125)
-          sim_data <- data.frame(
-            date = seq.Date(from = as.Date("2024-01-01"), by = "day", length.out = 100),
-            y = cumsum(rnorm(100, mean = 0.5, sd = 1))
-          )
-
-          tryCatch({
-            result <- nixtla_client_forecast(
-              data = sim_data,
-              time_col = "date",
-              value_col = "y",
-              freq = "D",
-              horizon = 10
-            )
-            print("=== Simulated Forecast Result ===")
-            print(result)
-          }, error = function(e) {
-            message("Nixtla simulated forecast failed: ", conditionMessage(e))
-          })
-          EOF
+          path: sitio2_cache
+          key: knitr-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: knitr-${{ runner.os }}-
 
       - name: Render RMarkdown
         if: always()
